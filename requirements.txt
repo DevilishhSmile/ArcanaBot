@@ -1,0 +1,5 @@
+discord.py==2.3.2
+python-dotenv==1.0.0
+gspread==6.0.2
+google-auth==2.27.0
+aiosqlite==0.20.0
