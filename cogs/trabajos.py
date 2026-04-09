@@ -1,0 +1,251 @@
+import discord
+from discord import app_commands
+from discord.ext import commands
+
+from utils.constants import (
+    GUILD_ID, CANAL_REGISTRO_TRABAJOS, CANAL_CARTA_ACEPTACION,
+    CANAL_FICHAS_TRABAJADORES, ROL_STAFF, ROL_TRABAJADOR,
+    get_slots_config, COLOR_APROBADO, COLOR_RECHAZADO, CARGOS,
+)
+from utils.helpers import (
+    is_valid_character_name, clean_field, default_if_empty,
+    build_review_embed, build_acceptance_embed,
+    format_worker_sheet, publicar_ficha_con_imagenes,
+    validar_edad_adulto,
+)
+from utils.sheets import aprobar_trabajador, rechazar_trabajo, get_trabajadores_aprobados_por_cargo
+from utils.database import puede_registrar, registrar_personaje, usar_slot_extra, get_conteo_usuario
+from utils.image_handler import registrar_espera
+from cogs.admin import cargar_generacion
+from cogs.estudiantes import RechazoFichaModal
+
+
+class CargoSelect(discord.ui.Select):
+    def __init__(self):
+        options = [discord.SelectOption(label=c, value=c) for c in CARGOS.keys()]
+        super().__init__(placeholder="🏷️ Selecciona el cargo...", min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        cargo         = self.values[0]
+        cupo_efectivo = CARGOS.get(cargo) or 1
+        ocupados      = get_trabajadores_aprobados_por_cargo(cargo)
+        if ocupados >= cupo_efectivo:
+            await interaction.response.send_message(f"❌ **{cargo}** ya no tiene cupos disponibles.", ephemeral=True)
+            return
+        self.disabled = True
+        await interaction.response.send_modal(TrabajadorModal1(cargo=cargo, user_id=interaction.user.id))
+
+class CargoSelectView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=120)
+        self.add_item(CargoSelect())
+
+
+class TrabajadorModal1(discord.ui.Modal, title="🧑‍💼 Ficha de Trabajador — Parte 1/2"):
+    personaje = discord.ui.TextInput(label="Nombre del personaje", placeholder="Ej: Rowena Ashveil", min_length=2, max_length=50)
+    edad      = discord.ui.TextInput(label="Edad (mínimo 25 años)", placeholder="Ej: 29 — Los trabajadores tienen edad mínima de 25", min_length=1, max_length=3)
+    pronouns  = discord.ui.TextInput(label="Pronombres", placeholder="Ej: él/sus, ella/sus, elle/sus", min_length=2, max_length=30)
+    especie   = discord.ui.TextInput(label="Especie", placeholder="Ej: Humano, Élfico, Híbrido...", min_length=2, max_length=50)
+    elemento  = discord.ui.TextInput(label="Elemento mágico", placeholder="Ej: Tierra, Luz, Sin elemento...", min_length=2, max_length=50)
+
+    def __init__(self, cargo, user_id):
+        super().__init__()
+        self.cargo   = cargo
+        self.user_id = user_id
+
+    async def on_submit(self, interaction: discord.Interaction):
+        nombre = self.personaje.value.strip()
+        if not is_valid_character_name(nombre):
+            await interaction.response.send_message("❌ Nombre no válido.", ephemeral=True)
+            return
+
+        valida, msg = validar_edad_adulto(self.edad.value)
+        if not valida:
+            await interaction.response.send_message(msg, ephemeral=True)
+            return
+
+        gen    = cargar_generacion()
+        config = get_slots_config()
+        res    = await puede_registrar(interaction.user.id, "trabajadores", gen, config.get("trabajadores"))
+
+        if not res["puede"]:
+            if res["tiene_slot_extra"]:
+                _guardar_temp(interaction.client, interaction.user.id, {
+                    "personaje": clean_field(nombre), "edad": clean_field(self.edad.value),
+                    "pronouns": clean_field(self.pronouns.value), "especie": clean_field(self.especie.value),
+                    "elemento": clean_field(self.elemento.value), "cargo": self.cargo, "usar_slot_extra": True,
+                })
+                await interaction.response.send_message(
+                    f"⚠️ Límite de trabajadores. ✨ Slot disponible. ¿Usarlo para **{nombre}**?",
+                    view=ConfirmarSlotView(interaction.user.id), ephemeral=True)
+            else:
+                await interaction.response.send_message(f"❌ {res['razon']}", ephemeral=True)
+            return
+
+        _guardar_temp(interaction.client, interaction.user.id, {
+            "personaje": clean_field(nombre), "edad": clean_field(self.edad.value),
+            "pronouns": clean_field(self.pronouns.value), "especie": clean_field(self.especie.value),
+            "elemento": clean_field(self.elemento.value), "cargo": self.cargo, "usar_slot_extra": False,
+        })
+        await interaction.response.send_message(
+            "✅ **Parte 1 recibida.** Presiona para continuar.",
+            view=ContinuarModal2View(interaction.user.id), ephemeral=True)
+
+
+class TrabajadorModal2(discord.ui.Modal, title="🧑‍💼 Ficha de Trabajador — Parte 2/2"):
+    habilidades  = discord.ui.TextInput(label="Poderes / Habilidades", style=discord.TextStyle.paragraph,
+                                         placeholder="Salud, estado físico, habilidades mágicas...", min_length=10, max_length=500)
+    debilidades  = discord.ui.TextInput(label="Debilidades", style=discord.TextStyle.paragraph,
+                                         placeholder="¿A qué es vulnerable?", min_length=10, max_length=500)
+    personalidad = discord.ui.TextInput(label="Personalidad", style=discord.TextStyle.paragraph,
+                                         placeholder="Sanidad, inteligencia, rasgos de personalidad...", min_length=10, max_length=500)
+    historia     = discord.ui.TextInput(label="Historia", style=discord.TextStyle.paragraph,
+                                         placeholder="Trasfondo del personaje...", min_length=20, max_length=1000)
+    extras       = discord.ui.TextInput(label="Hobbies | Gustos | Disgustos", style=discord.TextStyle.paragraph,
+                                         placeholder="Hobbies: ...\nGustos: ...\nDisgustos: ...", min_length=5, max_length=500)
+
+    def __init__(self, user_id):
+        super().__init__()
+        self.user_id = user_id
+
+    async def on_submit(self, interaction: discord.Interaction):
+        datos1 = _obtener_temp(interaction.client, self.user_id)
+        if not datos1:
+            await interaction.response.send_message("❌ Sesión expirada. Usa `/ficha-trabajador` de nuevo.", ephemeral=True)
+            return
+        ext  = _parsear_extras(self.extras.value)
+        data = {
+            **datos1, "user_id": interaction.user.id, "username": str(interaction.user),
+            "habilidades":  clean_field(self.habilidades.value),
+            "debilidades":  clean_field(self.debilidades.value),
+            "personalidad": clean_field(self.personalidad.value),
+            "historia":     clean_field(self.historia.value),
+            "hobbies":      default_if_empty(ext.get("hobbies", "")),
+            "gustos":       default_if_empty(ext.get("gustos", "")),
+            "disgustos":    default_if_empty(ext.get("disgustos", "")),
+            "imagen": "",
+        }
+        _guardar_temp(interaction.client, self.user_id, data)
+        registrar_espera(interaction.user.id, "trabajador", interaction.channel_id, data)
+        await interaction.response.send_message(
+            f"✅ **Formulario completado para {data['personaje']}.**\n\n"
+            f"📎 Envía la imagen en este canal. Pégala 📋 o adjúntala 🖼️\n*Escribe `sin imagen` si no tienes una.*",
+            ephemeral=True)
+
+
+class ContinuarModal2View(discord.ui.View):
+    def __init__(self, user_id):
+        super().__init__(timeout=300)
+        self.user_id = user_id
+
+    @discord.ui.button(label="📝 Continuar — Parte 2", style=discord.ButtonStyle.primary)
+    async def continuar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(TrabajadorModal2(self.user_id))
+        self.stop()
+
+
+class ConfirmarSlotView(discord.ui.View):
+    def __init__(self, user_id):
+        super().__init__(timeout=120)
+        self.user_id = user_id
+
+    @discord.ui.button(label="✨ Sí, usar slot adicional", style=discord.ButtonStyle.success)
+    async def confirmar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(content="✅ Slot reservado.", view=ContinuarModal2View(self.user_id))
+        self.stop()
+
+    @discord.ui.button(label="❌ Cancelar", style=discord.ButtonStyle.secondary)
+    async def cancelar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        _limpiar_temp(interaction.client, self.user_id)
+        await interaction.response.edit_message(content="Cancelado.", view=None)
+        self.stop()
+
+
+class TrabajadorReviewView(discord.ui.View):
+    def __init__(self, data):
+        super().__init__(timeout=None)
+        self.data = data
+
+    def _es_staff(self, i):
+        return any(r.id == ROL_STAFF for r in i.user.roles)
+
+    @discord.ui.button(label="✅ Aprobar", style=discord.ButtonStyle.success, custom_id="trabajador_aprobar")
+    async def aprobar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self._es_staff(interaction):
+            await interaction.response.send_message("❌ Solo el staff puede.", ephemeral=True)
+            return
+        user_id = self.data["user_id"]
+        gen     = cargar_generacion()
+        try:
+            if self.data.get("usar_slot_extra"): await usar_slot_extra(user_id, "trabajadores", gen)
+            else: await registrar_personaje(user_id, "trabajadores", gen)
+        except Exception as e: print(f"[TRABAJOS] DB: {e}")
+        try: aprobar_trabajador(self.data, gen, str(interaction.user))
+        except Exception as e: print(f"[TRABAJOS] Sheets: {e}")
+        try:
+            guild  = interaction.guild
+            member = guild.get_member(user_id) or await guild.fetch_member(user_id)
+            rol    = guild.get_role(ROL_TRABAJADOR)
+            if rol and member: await member.add_roles(rol, reason="Ficha aprobada")
+        except Exception as e: print(f"[TRABAJOS] Rol: {e}")
+        canal = interaction.client.get_channel(CANAL_FICHAS_TRABAJADORES)
+        if canal: await publicar_ficha_con_imagenes(canal, format_worker_sheet(self.data), self.data)
+        canal_carta = interaction.client.get_channel(CANAL_CARTA_ACEPTACION)
+        if canal_carta:
+            conteo = await get_conteo_usuario(user_id, gen)
+            await canal_carta.send(embed=build_acceptance_embed("trabajador", self.data["personaje"], user_id, conteo, gen))
+        updated = discord.Embed(title="🧑‍💼 Ficha Trabajador — APROBADA ✅",
+            description=f"**Personaje:** {self.data['personaje']}\n**Cargo:** {self.data.get('cargo','')}\n**Usuario:** <@{user_id}>",
+            color=COLOR_APROBADO)
+        updated.set_footer(text=f"Aprobado por {interaction.user.display_name}")
+        await interaction.message.edit(embed=updated, view=None)
+        await interaction.response.send_message("✅ Aprobado.", ephemeral=True)
+
+    @discord.ui.button(label="❌ Rechazar", style=discord.ButtonStyle.danger, custom_id="trabajador_rechazar")
+    async def rechazar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self._es_staff(interaction):
+            await interaction.response.send_message("❌ Solo el staff puede.", ephemeral=True)
+            return
+        await interaction.response.send_modal(RechazoFichaModal(
+            data=self.data, review_message=interaction.message,
+            canal_id=CANAL_REGISTRO_TRABAJOS, rechazar_fn=rechazar_trabajo))
+
+
+def _guardar_temp(c, uid, d):
+    if not hasattr(c, "_ficha_temp"): c._ficha_temp = {}
+    c._ficha_temp[uid] = d
+
+def _obtener_temp(c, uid):
+    return getattr(c, "_ficha_temp", {}).get(uid)
+
+def _limpiar_temp(c, uid):
+    if hasattr(c, "_ficha_temp") and uid in c._ficha_temp: del c._ficha_temp[uid]
+
+def _parsear_extras(texto):
+    r = {}
+    for linea in texto.splitlines():
+        for clave in ["hobbies", "gustos", "disgustos"]:
+            if linea.lower().startswith(f"{clave}:"):
+                r[clave] = linea[len(clave)+1:].strip()
+                break
+    return r
+
+
+class Trabajos(commands.Cog):
+    def __init__(self, bot): self.bot = bot
+
+    @app_commands.command(name="ficha-trabajador", description="Registra la ficha de tu personaje trabajador.")
+    @app_commands.guilds(discord.Object(id=GUILD_ID))
+    async def ficha_trabajador(self, interaction: discord.Interaction):
+        if CANAL_REGISTRO_TRABAJOS and interaction.channel_id != CANAL_REGISTRO_TRABAJOS:
+            canal = self.bot.get_channel(CANAL_REGISTRO_TRABAJOS)
+            mencionar = canal.mention if canal else f"<#{CANAL_REGISTRO_TRABAJOS}>"
+            await interaction.response.send_message(f"❌ Usa este comando en {mencionar}.", ephemeral=True)
+            return
+        await interaction.response.send_message(
+            "🏷️ **Selecciona el cargo de tu personaje:**",
+            view=CargoSelectView(), ephemeral=True)
+
+
+async def setup(bot):
+    await bot.add_cog(Trabajos(bot))
