@@ -35,7 +35,8 @@ ROL_STAFF          = int(os.getenv("ROL_STAFF", 0))
 ROL_ESTUDIANTE     = int(os.getenv("ROL_ESTUDIANTE", 0))
 ROL_PROFESOR       = int(os.getenv("ROL_PROFESOR", 0))
 ROL_TRABAJADOR     = int(os.getenv("ROL_TRABAJADOR", 0))
-ROL_SLOT_ADICIONAL = 1217564303612182610  # +Slot de Personaje
+ROL_SLOT_ADICIONAL = 1217564303612182610
+ROL_REGISTRADO    = 1221480425042739363  # Rol que se da al aprobar cualquier ficha por primera vez
 
 SHEET_UNIFORMES_PENDIENTES   = "UniformesPendientes"
 SHEET_UNIFORMES_APROBADOS    = "UniformesAprobados"

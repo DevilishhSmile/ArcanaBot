@@ -4,7 +4,7 @@ from discord.ext import commands
 
 from utils.constants import (
     GUILD_ID, CANAL_REGISTRAR_ESTUDIANTE, CANAL_CARTA_ACEPTACION,
-    CANAL_FICHAS_ESTUDIANTES, ROL_STAFF, ROL_ESTUDIANTE,
+    CANAL_FICHAS_ESTUDIANTES, ROL_STAFF, ROL_ESTUDIANTE, ROL_REGISTRADO,
     get_slots_config, COLOR_PENDIENTE, COLOR_APROBADO, COLOR_RECHAZADO, CLUBES,
 )
 from utils.helpers import (
@@ -236,6 +236,10 @@ class EstudianteReviewView(discord.ui.View):
             member = guild.get_member(user_id) or await guild.fetch_member(user_id)
             rol    = guild.get_role(ROL_ESTUDIANTE)
             if rol and member: await member.add_roles(rol, reason="Ficha aprobada")
+            # Dar rol Registrado si no lo tiene (primera ficha aprobada)
+            rol_reg = guild.get_role(ROL_REGISTRADO)
+            if rol_reg and rol_reg not in member.roles:
+                await member.add_roles(rol_reg, reason="Primera ficha aprobada")
             for club_id in self.data.get("clubes_ids", []):
                 r = guild.get_role(club_id)
                 if r and member and r not in member.roles: await member.add_roles(r, reason="Club asignado")

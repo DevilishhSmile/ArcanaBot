@@ -4,7 +4,7 @@ from discord.ext import commands
 
 from utils.constants import (
     GUILD_ID, CANAL_REGISTRO_TRABAJOS, CANAL_CARTA_ACEPTACION,
-    CANAL_FICHAS_TRABAJADORES, ROL_STAFF, ROL_TRABAJADOR,
+    CANAL_FICHAS_TRABAJADORES, ROL_STAFF, ROL_TRABAJADOR, ROL_REGISTRADO,
     get_slots_config, COLOR_APROBADO, COLOR_RECHAZADO, CARGOS,
 )
 from utils.helpers import (
@@ -187,6 +187,10 @@ class TrabajadorReviewView(discord.ui.View):
             member = guild.get_member(user_id) or await guild.fetch_member(user_id)
             rol    = guild.get_role(ROL_TRABAJADOR)
             if rol and member: await member.add_roles(rol, reason="Ficha aprobada")
+            # Dar rol Registrado si no lo tiene (primera ficha aprobada)
+            rol_reg = guild.get_role(ROL_REGISTRADO)
+            if rol_reg and rol_reg not in member.roles:
+                await member.add_roles(rol_reg, reason="Primera ficha aprobada")
         except Exception as e: print(f"[TRABAJOS] Rol: {e}")
         canal = interaction.client.get_channel(CANAL_FICHAS_TRABAJADORES)
         if canal: await publicar_ficha_con_imagenes(canal, format_worker_sheet(self.data), self.data)
