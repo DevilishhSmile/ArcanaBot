@@ -217,7 +217,7 @@ async def on_error(event, *args, **kwargs):
 
 async def load_cogs():
     # admin PRIMERO — otros cogs lo importan
-    cogs = ["cogs.admin", "cogs.uniformes", "cogs.estudiantes",
+    cogs = ["cogs.admin", "cogs.admin_data", "cogs.uniformes", "cogs.estudiantes",
             "cogs.profesores", "cogs.trabajos"]
     for cog in cogs:
         try:
