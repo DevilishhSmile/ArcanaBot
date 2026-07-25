@@ -251,7 +251,8 @@ async def load_cogs():
         "cogs.estudiantes",
         "cogs.profesores",
         "cogs.trabajos",
-        "cogs.editar_ficha",   # ← nuevo
+        "cogs.editar_ficha",
+        "cogs.pca",
     ]
     for cog in cogs:
         try:
