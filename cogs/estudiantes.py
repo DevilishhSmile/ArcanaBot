@@ -10,8 +10,7 @@ from utils.constants import (
 from utils.helpers import (
     is_valid_character_name, clean_field, default_if_empty,
     build_review_embed, build_acceptance_embed,
-    format_student_sheet, publicar_ficha_con_imagenes,
-    validar_edad_estudiante,
+    publicar_ficha_con_imagenes, validar_edad_estudiante,
 )
 from utils.sheets import has_approved_uniform, aprobar_estudiante, rechazar_estudiante
 from utils.database import puede_registrar, registrar_personaje, usar_slot_extra, get_conteo_usuario
@@ -19,9 +18,11 @@ from utils.image_handler import registrar_espera
 from cogs.admin import cargar_generacion
 
 
-class EstudianteModal1(discord.ui.Modal, title="🎓 Ficha de Estudiante — Parte 1/2"):
+# ── MODAL PARTE 1 — Datos básicos ─────────────
+
+class EstudianteModal1(discord.ui.Modal, title="🎓 Ficha de Estudiante — Parte 1/3"):
     personaje = discord.ui.TextInput(label="Nombre del personaje", placeholder="Ej: Lysander Vael", min_length=2, max_length=50)
-    edad      = discord.ui.TextInput(label="Edad (máximo 18 años)", placeholder="Ej: 17 — Los estudiantes tienen edad máxima de 18", min_length=1, max_length=3)
+    edad      = discord.ui.TextInput(label="Edad (máximo 18 años)", placeholder="Máximo 18 — los estudiantes son menores de edad", min_length=1, max_length=3)
     pronouns  = discord.ui.TextInput(label="Pronombres", placeholder="Ej: él/sus, ella/sus, elle/sus", min_length=2, max_length=30)
     especie   = discord.ui.TextInput(label="Especie", placeholder="Ej: Humano, Élfico, Híbrido...", min_length=2, max_length=50)
     elemento  = discord.ui.TextInput(label="Elemento mágico", placeholder="Ej: Fuego, Agua, Sombra...", min_length=2, max_length=50)
@@ -32,10 +33,9 @@ class EstudianteModal1(discord.ui.Modal, title="🎓 Ficha de Estudiante — Par
             await interaction.response.send_message("❌ Nombre no válido. Solo letras, espacios y guiones.", ephemeral=True)
             return
 
-        # Validar edad máxima 18
-        valida, msg_error = validar_edad_estudiante(self.edad.value)
+        valida, msg = validar_edad_estudiante(self.edad.value)
         if not valida:
-            await interaction.response.send_message(msg_error, ephemeral=True)
+            await interaction.response.send_message(msg, ephemeral=True)
             return
 
         if not has_approved_uniform(interaction.user.id, nombre):
@@ -66,40 +66,36 @@ class EstudianteModal1(discord.ui.Modal, title="🎓 Ficha de Estudiante — Par
             "elemento": clean_field(self.elemento.value), "usar_slot_extra": False,
         })
         await interaction.response.send_message(
-            "✅ **Parte 1 recibida.** Presiona para continuar.",
+            "✅ **Parte 1 recibida.** Presiona para continuar con poderes y personalidad.",
             view=ContinuarModal2View(interaction.user.id), ephemeral=True)
 
 
-class EstudianteModal2(discord.ui.Modal, title="🎓 Ficha de Estudiante — Parte 2/2"):
+# ── MODAL PARTE 2 — Poderes, personalidad e historia ──
+
+class EstudianteModal2(discord.ui.Modal, title="🎓 Ficha de Estudiante — Parte 2/3"):
     habilidades  = discord.ui.TextInput(
         label="Poderes / Habilidades",
         style=discord.TextStyle.paragraph,
-        placeholder="Salud, estado físico, habilidades mágicas...",
-        min_length=10, max_length=500,
+        placeholder="Salud, estado físico, habilidades mágicas y especiales...",
+        min_length=10, max_length=800,
     )
     debilidades  = discord.ui.TextInput(
         label="Debilidades",
         style=discord.TextStyle.paragraph,
-        placeholder="¿A qué es vulnerable? ¿Qué limitaciones tiene?",
-        min_length=10, max_length=500,
+        placeholder="Vulnerabilidades, limitaciones, miedos que lo afecten en combate...",
+        min_length=10, max_length=800,
     )
     personalidad = discord.ui.TextInput(
         label="Personalidad",
         style=discord.TextStyle.paragraph,
-        placeholder="Sanidad, inteligencia, rasgos de personalidad...",
-        min_length=10, max_length=500,
+        placeholder="Sanidad, inteligencia, rasgos de carácter, cómo se comporta...",
+        min_length=10, max_length=800,
     )
     historia     = discord.ui.TextInput(
         label="Historia",
         style=discord.TextStyle.paragraph,
-        placeholder="Trasfondo del personaje...",
-        min_length=20, max_length=1000,
-    )
-    extras       = discord.ui.TextInput(
-        label="Hobbies | Gustos | Disgustos",
-        style=discord.TextStyle.paragraph,
-        placeholder="Hobbies: ...\nGustos: ...\nDisgustos: ...",
-        min_length=5, max_length=500,
+        placeholder="Trasfondo y origen del personaje, eventos importantes de su vida...",
+        min_length=20, max_length=1500,
     )
 
     def __init__(self, user_id):
@@ -111,24 +107,72 @@ class EstudianteModal2(discord.ui.Modal, title="🎓 Ficha de Estudiante — Par
         if not datos1:
             await interaction.response.send_message("❌ Sesión expirada. Usa `/ficha-estudiante` de nuevo.", ephemeral=True)
             return
-        ext  = _parsear_extras(self.extras.value)
-        data = {
+
+        datos2 = {
             **datos1,
-            "user_id":      interaction.user.id,
-            "username":     str(interaction.user),
             "habilidades":  clean_field(self.habilidades.value),
             "debilidades":  clean_field(self.debilidades.value),
             "personalidad": clean_field(self.personalidad.value),
             "historia":     clean_field(self.historia.value),
-            "hobbies":      default_if_empty(ext.get("hobbies", "")),
-            "gustos":       default_if_empty(ext.get("gustos", "")),
-            "disgustos":    default_if_empty(ext.get("disgustos", "")),
-            "clubes_nombres": [], "clubes_ids": [], "imagen": "",
         }
-        _guardar_temp(interaction.client, self.user_id, data)
+        _guardar_temp(interaction.client, self.user_id, datos2)
+
         await interaction.response.send_message(
-            "✅ **Parte 2 recibida.**\n\n🎭 Selecciona el/los club(es) de tu personaje.",
-            view=ClubesSelectView(self.user_id, interaction.channel_id), ephemeral=True)
+            "✅ **Parte 2 recibida.** Ahora ingresa hobbies, gustos y disgustos.",
+            view=ContinuarModal3View(self.user_id), ephemeral=True)
+
+
+# ── MODAL PARTE 3 — Hobbies, gustos, disgustos (campos separados) ──
+
+class EstudianteModal3(discord.ui.Modal, title="🎓 Ficha de Estudiante — Parte 3/3"):
+    hobbies = discord.ui.TextInput(
+        label="Hobbies",
+        style=discord.TextStyle.paragraph,
+        placeholder="¿Qué le gusta hacer en su tiempo libre? (actividades, pasatiempos...)",
+        required=False,
+        max_length=300,
+    )
+    gustos = discord.ui.TextInput(
+        label="Gustos",
+        style=discord.TextStyle.paragraph,
+        placeholder="¿Qué cosas le agradan, le gustan o disfruta? (comida, lugares, personas...)",
+        required=False,
+        max_length=300,
+    )
+    disgustos = discord.ui.TextInput(
+        label="Disgustos",
+        style=discord.TextStyle.paragraph,
+        placeholder="¿Qué cosas le desagradan o no soporta?",
+        required=False,
+        max_length=300,
+    )
+
+    def __init__(self, user_id: int, canal_id: int):
+        super().__init__()
+        self.user_id  = user_id
+        self.canal_id = canal_id
+
+    async def on_submit(self, interaction: discord.Interaction):
+        datos = _obtener_temp(interaction.client, self.user_id)
+        if not datos:
+            await interaction.response.send_message("❌ Sesión expirada. Usa `/ficha-estudiante` de nuevo.", ephemeral=True)
+            return
+
+        datos["hobbies"]   = default_if_empty(self.hobbies.value)
+        datos["gustos"]    = default_if_empty(self.gustos.value)
+        datos["disgustos"] = default_if_empty(self.disgustos.value)
+        datos["user_id"]   = interaction.user.id
+        datos["username"]  = str(interaction.user)
+        datos["clubes_nombres"] = datos.get("clubes_nombres", [])
+        datos["clubes_ids"]     = datos.get("clubes_ids", [])
+        datos["imagen"]         = ""
+        datos["_tipo"]          = "estudiante"
+        _guardar_temp(interaction.client, self.user_id, datos)
+
+        # Ir al selector de clubes
+        await interaction.response.send_message(
+            "✅ **Parte 3 recibida.**\n\n🎭 Selecciona el/los club(es) de tu personaje.",
+            view=ClubesSelectView(self.user_id, self.canal_id), ephemeral=True)
 
 
 # ── SELECT CLUBES ─────────────────────────────
@@ -171,9 +215,13 @@ class ClubesSelectView(discord.ui.View):
         registrar_espera(interaction.user.id, "estudiante", self.canal_id, data)
         clubs_txt = ", ".join(clubes) if clubes else "Ninguno"
         await interaction.response.edit_message(
-            content=(f"✅ **Clubes:** {clubs_txt}\n\n"
-                     f"📎 Ahora **envía la imagen de tu personaje** en este canal.\n"
-                     f"Pégala 📋 o adjúntala 🖼️  *Escribe `sin imagen` si no tienes una.*"),
+            content=(
+                f"✅ **Clubes:** {clubs_txt}\n\n"
+                f"📎 Último paso — **envía la imagen de tu personaje en este canal**.\n"
+                f"Pégala 📋 o adjúntala desde tu galería 🖼️\n\n"
+                f"*Puedes adjuntar varias imágenes en el mismo mensaje.*\n"
+                f"*Escribe `sin imagen` si no tienes una.*"
+            ),
             view=None)
         self.stop()
 
@@ -191,6 +239,18 @@ class ContinuarModal2View(discord.ui.View):
         self.stop()
 
 
+class ContinuarModal3View(discord.ui.View):
+    def __init__(self, user_id):
+        super().__init__(timeout=300)
+        self.user_id = user_id
+
+    @discord.ui.button(label="📝 Continuar — Parte 3", style=discord.ButtonStyle.primary)
+    async def continuar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(
+            EstudianteModal3(user_id=self.user_id, canal_id=interaction.channel_id))
+        self.stop()
+
+
 class ConfirmarSlotView(discord.ui.View):
     def __init__(self, user_id):
         super().__init__(timeout=120)
@@ -198,7 +258,8 @@ class ConfirmarSlotView(discord.ui.View):
 
     @discord.ui.button(label="✨ Sí, usar slot adicional", style=discord.ButtonStyle.success)
     async def confirmar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(content="✅ Slot reservado.", view=ContinuarModal2View(self.user_id))
+        await interaction.response.edit_message(
+            content="✅ Slot reservado.", view=ContinuarModal2View(self.user_id))
         self.stop()
 
     @discord.ui.button(label="❌ Cancelar", style=discord.ButtonStyle.secondary)
@@ -234,22 +295,30 @@ class EstudianteReviewView(discord.ui.View):
         try:
             guild  = interaction.guild
             member = guild.get_member(user_id) or await guild.fetch_member(user_id)
-            rol    = guild.get_role(ROL_ESTUDIANTE)
-            if rol and member: await member.add_roles(rol, reason="Ficha aprobada")
-            # Dar rol Registrado si no lo tiene (primera ficha aprobada)
+            # Rol de estudiante
+            rol = guild.get_role(ROL_ESTUDIANTE)
+            if rol and member and rol not in member.roles:
+                await member.add_roles(rol, reason="Ficha aprobada")
+            # Rol registrado (primera ficha)
             rol_reg = guild.get_role(ROL_REGISTRADO)
-            if rol_reg and rol_reg not in member.roles:
+            if rol_reg and member and rol_reg not in member.roles:
                 await member.add_roles(rol_reg, reason="Primera ficha aprobada")
+            # Roles de clubes
             for club_id in self.data.get("clubes_ids", []):
                 r = guild.get_role(club_id)
-                if r and member and r not in member.roles: await member.add_roles(r, reason="Club asignado")
+                if r and member and r not in member.roles:
+                    await member.add_roles(r, reason="Club asignado")
         except Exception as e: print(f"[ESTUDIANTES] Roles: {e}")
+
         canal = interaction.client.get_channel(CANAL_FICHAS_ESTUDIANTES)
-        if canal: await publicar_ficha_con_imagenes(canal, format_student_sheet(self.data), self.data)
+        if canal:
+            await publicar_ficha_con_imagenes(canal, "", self.data)
+
         canal_carta = interaction.client.get_channel(CANAL_CARTA_ACEPTACION)
         if canal_carta:
             conteo = await get_conteo_usuario(user_id, gen)
             await canal_carta.send(embed=build_acceptance_embed("estudiante", self.data["personaje"], user_id, conteo, gen))
+
         updated = discord.Embed(title="🎓 Ficha Estudiante — APROBADA ✅",
             description=f"**Personaje:** {self.data['personaje']}\n**Usuario:** <@{user_id}>", color=COLOR_APROBADO)
         updated.set_footer(text=f"Aprobado por {interaction.user.display_name}")
@@ -266,12 +335,14 @@ class EstudianteReviewView(discord.ui.View):
             canal_id=CANAL_REGISTRAR_ESTUDIANTE, rechazar_fn=rechazar_estudiante))
 
 
+# ── RECHAZO ───────────────────────────────────
+
 class RechazoFichaModal(discord.ui.Modal, title="✏️ Motivo de rechazo"):
     motivo = discord.ui.TextInput(
         label="¿Por qué se rechaza?",
         style=discord.TextStyle.paragraph,
         placeholder="Explica el motivo al usuario...",
-        min_length=0, max_length=500, required=False)
+        required=False, max_length=500)
 
     def __init__(self, data, review_message, canal_id, rechazar_fn):
         super().__init__()
@@ -314,15 +385,8 @@ def _obtener_temp(c, uid):
 def _limpiar_temp(c, uid):
     if hasattr(c, "_ficha_temp") and uid in c._ficha_temp: del c._ficha_temp[uid]
 
-def _parsear_extras(texto):
-    r = {}
-    for linea in texto.splitlines():
-        for clave in ["hobbies", "gustos", "disgustos"]:
-            if linea.lower().startswith(f"{clave}:"):
-                r[clave] = linea[len(clave)+1:].strip()
-                break
-    return r
 
+# ── COG ──────────────────────────────────────
 
 class Estudiantes(commands.Cog):
     def __init__(self, bot): self.bot = bot
