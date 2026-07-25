@@ -23,7 +23,6 @@ def clean_field(text: str) -> str:
     return re.sub(r"\s+", " ", remove_emojis(text)).strip()
 
 def validar_edad_estudiante(edad_str: str) -> tuple[bool, str]:
-    """Valida que la edad del estudiante sea un número entre 1 y 18."""
     try:
         edad = int(edad_str.strip())
         if edad > 18:
@@ -35,7 +34,6 @@ def validar_edad_estudiante(edad_str: str) -> tuple[bool, str]:
         return False, "❌ La edad debe ser un número."
 
 def validar_edad_adulto(edad_str: str) -> tuple[bool, str]:
-    """Valida que la edad de profesores/trabajadores sea mínimo 25."""
     try:
         edad = int(edad_str.strip())
         if edad < 25:
@@ -45,18 +43,16 @@ def validar_edad_adulto(edad_str: str) -> tuple[bool, str]:
         return False, "❌ La edad debe ser un número."
 
 # ──────────────────────────────────────────────
-# FORMATOS DE FICHA RP — Nuevos formatos estéticos
+# FORMATOS DE FICHA EN 2 PARTES
+# Parte 1: datos básicos + poderes/debilidades
+# Parte 2: personalidad + historia + hobbies/gustos/disgustos + crédito
+# Las imágenes van después de la parte 2
 # ──────────────────────────────────────────────
 
-def format_student_sheet(data: dict) -> str:
+def format_student_sheet_parte1(data: dict) -> str:
     clubes = data.get("clubes_nombres", data.get("club", "No especificado"))
     if isinstance(clubes, list):
         clubes = ", ".join(clubes) if clubes else "Ninguno"
-
-    hobbies   = data.get("hobbies",   "No especificado")
-    gustos    = data.get("gustos",    "No especificado")
-    disgustos = data.get("disgustos", "No especificado")
-
     return (
         "╭─────┈╯  𓈃  ⋆ ࣪.  🔮 ◌Ⳋ𝅄\n"
         " `💌`     ࣪  *𝑫𝒆𝒂𝒓* ࣪  ᚐ  ִ  *𝑺𝒕𝒖𝒅𝒆𝒏𝒕* ބ  ࣪\n"
@@ -66,21 +62,23 @@ def format_student_sheet(data: dict) -> str:
         "︶⊹︶︶⠀𖥔  ︶︶⊹︶\n"
         f"⊹ ࣪ ˖  **Poderes/Habilidades;** {data['habilidades']}\n"
         f"⊹ ࣪ ˖  **Debilidades;** {data['debilidades']}\n"
+        "╰─────────────  ✦ ⁺."
+    )
+
+def format_student_sheet_parte2(data: dict) -> str:
+    return (
         "︶⊹︶︶⠀𖥔  ︶︶⊹︶\n"
         f"⊹ ࣪ ˖  **Personalidad;** {data['personalidad']}\n"
         f"⊹ ࣪ ˖  **Historia;** {data['historia']}\n"
         "︶⊹︶︶⠀𖥔  ︶︶⊹︶\n"
-        f"⊹ ࣪ ˖  **Hobbies;** {hobbies}\n"
-        f"⊹ ࣪ ˖  **Gustos;** {gustos}\n"
-        f"⊹ ࣪ ˖  **Disgustos;** {disgustos}\n"
-        "╰─────────────  ✦ ⁺."
+        f"⊹ ࣪ ˖  **Hobbies;** {default_if_empty(data.get('hobbies',''))}\n"
+        f"⊹ ࣪ ˖  **Gustos;** {default_if_empty(data.get('gustos',''))}\n"
+        f"⊹ ࣪ ˖  **Disgustos;** {default_if_empty(data.get('disgustos',''))}\n"
+        "╰─────────────  ✦ ⁺.\n"
+        f"*Registrado por <@{data['user_id']}>*"
     )
 
-def format_teacher_sheet(data: dict) -> str:
-    hobbies   = data.get("hobbies",   "No especificado")
-    gustos    = data.get("gustos",    "No especificado")
-    disgustos = data.get("disgustos", "No especificado")
-
+def format_teacher_sheet_parte1(data: dict) -> str:
     return (
         "╭─────┈╯  𓈃  ⋆ ࣪.  🔮 ◌Ⳋ𝅄\n"
         " 💌     ࣪  𝑫𝒆𝒂𝒓 ࣪  ᚐ  ִ  𝑻𝒆𝒂𝒄𝒉𝒆𝒓 ބ  ࣪\n"
@@ -90,21 +88,23 @@ def format_teacher_sheet(data: dict) -> str:
         "︶⊹︶︶⠀𖥔  ︶︶⊹︶\n"
         f"⊹ ࣪ ˖  **Poderes/Habilidades;** {data['habilidades']}\n"
         f"⊹ ࣪ ˖  **Debilidades;** {data['debilidades']}\n"
+        "╰─────────────  ✦ ⁺."
+    )
+
+def format_teacher_sheet_parte2(data: dict) -> str:
+    return (
         "︶⊹︶︶⠀𖥔  ︶︶⊹︶\n"
         f"⊹ ࣪ ˖  **Personalidad;** {data['personalidad']}\n"
         f"⊹ ࣪ ˖  **Historia;** {data['historia']}\n"
         "︶⊹︶︶⠀𖥔  ︶︶⊹︶\n"
-        f"⊹ ࣪ ˖  **Hobbies;** {hobbies}\n"
-        f"⊹ ࣪ ˖  **Gustos;** {gustos}\n"
-        f"⊹ ࣪ ˖  **Disgustos;** {disgustos}\n"
-        "╰─────────────  ✦ ⁺."
+        f"⊹ ࣪ ˖  **Hobbies;** {default_if_empty(data.get('hobbies',''))}\n"
+        f"⊹ ࣪ ˖  **Gustos;** {default_if_empty(data.get('gustos',''))}\n"
+        f"⊹ ࣪ ˖  **Disgustos;** {default_if_empty(data.get('disgustos',''))}\n"
+        "╰─────────────  ✦ ⁺.\n"
+        f"*Registrado por <@{data['user_id']}>*"
     )
 
-def format_worker_sheet(data: dict) -> str:
-    hobbies   = data.get("hobbies",   "No especificado")
-    gustos    = data.get("gustos",    "No especificado")
-    disgustos = data.get("disgustos", "No especificado")
-
+def format_worker_sheet_parte1(data: dict) -> str:
     return (
         "╭─────┈╯  𓈃  ⋆ ࣪.  🔮 ◌Ⳋ𝅄\n"
         " 💌     ࣪  𝑫𝒆𝒂𝒓 ࣪  ᚐ  ִ  𝑾𝒐𝒓𝒌𝒆𝒓 ބ  ࣪\n"
@@ -114,15 +114,65 @@ def format_worker_sheet(data: dict) -> str:
         "︶⊹︶︶⠀𖥔  ︶︶⊹︶\n"
         f"⊹ ࣪ ˖  **Poderes/Habilidades;** {data['habilidades']}\n"
         f"⊹ ࣪ ˖  **Debilidades;** {data['debilidades']}\n"
+        "╰─────────────  ✦ ⁺."
+    )
+
+def format_worker_sheet_parte2(data: dict) -> str:
+    return (
         "︶⊹︶︶⠀𖥔  ︶︶⊹︶\n"
         f"⊹ ࣪ ˖  **Personalidad;** {data['personalidad']}\n"
         f"⊹ ࣪ ˖  **Historia;** {data['historia']}\n"
         "︶⊹︶︶⠀𖥔  ︶︶⊹︶\n"
-        f"⊹ ࣪ ˖  **Hobbies;** {hobbies}\n"
-        f"⊹ ࣪ ˖  **Gustos;** {gustos}\n"
-        f"⊹ ࣪ ˖  **Disgustos;** {disgustos}\n"
-        "╰─────────────  ✦ ⁺."
+        f"⊹ ࣪ ˖  **Hobbies;** {default_if_empty(data.get('hobbies',''))}\n"
+        f"⊹ ࣪ ˖  **Gustos;** {default_if_empty(data.get('gustos',''))}\n"
+        f"⊹ ࣪ ˖  **Disgustos;** {default_if_empty(data.get('disgustos',''))}\n"
+        "╰─────────────  ✦ ⁺.\n"
+        f"*Registrado por <@{data['user_id']}>*"
     )
+
+# Alias para compatibilidad
+def format_student_sheet(data): return format_student_sheet_parte1(data)
+def format_teacher_sheet(data): return format_teacher_sheet_parte1(data)
+def format_worker_sheet(data):  return format_worker_sheet_parte1(data)
+
+# ──────────────────────────────────────────────
+# PUBLICAR FICHA EN 2 MENSAJES + IMÁGENES
+# ──────────────────────────────────────────────
+
+async def publicar_ficha_con_imagenes(canal: discord.TextChannel,
+                                       texto: str, data: dict):
+    """
+    Publica la ficha en 2 mensajes para evitar el límite de 2000 chars,
+    luego envía todas las imágenes.
+    El parámetro 'texto' se ignora — usamos data directamente.
+    """
+    tipo = data.get("_tipo", "estudiante")
+
+    if tipo == "profesor":
+        parte1 = format_teacher_sheet_parte1(data)
+        parte2 = format_teacher_sheet_parte2(data)
+    elif tipo == "trabajador":
+        parte1 = format_worker_sheet_parte1(data)
+        parte2 = format_worker_sheet_parte2(data)
+    else:
+        parte1 = format_student_sheet_parte1(data)
+        parte2 = format_student_sheet_parte2(data)
+
+    await canal.send(parte1)
+    await canal.send(parte2)
+
+    # Imágenes
+    urls = []
+    if data.get("imagen"): urls.append(data["imagen"])
+    for url in data.get("imagenes", []):
+        if url and url not in urls: urls.append(url)
+    for url in urls:
+        try:
+            e = discord.Embed(color=COLOR_INFO)
+            e.set_image(url=url)
+            await canal.send(embed=e)
+        except Exception:
+            pass
 
 # ──────────────────────────────────────────────
 # EMBED DE REVISIÓN STAFF
@@ -157,20 +207,24 @@ def build_review_embed(tipo: str, data: dict, color=None) -> discord.Embed:
         clubes = data.get("clubes_nombres", data.get("club","—"))
         if isinstance(clubes, list): clubes = ", ".join(clubes) if clubes else "Ninguno"
         embed.add_field(name="Club(es)",  value=clubes,                    inline=True)
-        embed.add_field(name="Hobbies",   value=data.get("hobbies","—"),   inline=False)
-        embed.add_field(name="Gustos",    value=data.get("gustos","—"),    inline=True)
-        embed.add_field(name="Disgustos", value=data.get("disgustos","—"), inline=True)
+        embed.add_field(name="Hobbies",   value=default_if_empty(data.get("hobbies","")), inline=True)
+        embed.add_field(name="Gustos",    value=default_if_empty(data.get("gustos","")),  inline=True)
+        embed.add_field(name="Disgustos", value=default_if_empty(data.get("disgustos","")), inline=True)
 
-    embed.add_field(name="⚔️ Habilidades", value=data.get("habilidades","—")[:1024], inline=False)
-    embed.add_field(name="🩹 Debilidades", value=data.get("debilidades","—")[:1024], inline=False)
-    embed.add_field(name="🧠 Personalidad",value=data.get("personalidad","—")[:1024],inline=False)
-    embed.add_field(name="📖 Historia",    value=data.get("historia","—")[:1024],    inline=False)
+    # Truncar para el embed — la ficha completa se ve en el canal de fichas
+    def _trunc(txt, lim=500):
+        return (txt[:lim] + "...") if len(txt) > lim else txt
+
+    embed.add_field(name="⚔️ Habilidades", value=_trunc(data.get("habilidades","—")), inline=False)
+    embed.add_field(name="🩹 Debilidades", value=_trunc(data.get("debilidades","—")), inline=False)
+    embed.add_field(name="🧠 Personalidad",value=_trunc(data.get("personalidad","—")),inline=False)
+    embed.add_field(name="📖 Historia",    value=_trunc(data.get("historia","—")),    inline=False)
 
     if data.get("imagen"): embed.set_image(url=data["imagen"])
     return embed
 
 # ──────────────────────────────────────────────
-# CARTA DE ACEPTACIÓN — Morado
+# CARTA DE ACEPTACIÓN
 # ──────────────────────────────────────────────
 
 def build_acceptance_embed(tipo: str, personaje: str, user_id: int,
@@ -207,21 +261,3 @@ def build_acceptance_embed(tipo: str, personaje: str, user_id: int,
             inline=False
         )
     return embed
-
-# ──────────────────────────────────────────────
-# PUBLICAR FICHA CON TODAS LAS IMÁGENES
-# ──────────────────────────────────────────────
-
-async def publicar_ficha_con_imagenes(canal: discord.TextChannel, texto: str, data: dict):
-    await canal.send(texto)
-    urls = []
-    if data.get("imagen"): urls.append(data["imagen"])
-    for url in data.get("imagenes", []):
-        if url and url not in urls: urls.append(url)
-    for url in urls:
-        try:
-            e = discord.Embed(color=COLOR_INFO)
-            e.set_image(url=url)
-            await canal.send(embed=e)
-        except Exception:
-            pass
