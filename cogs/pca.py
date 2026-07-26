@@ -203,13 +203,18 @@ def _get_reduccion_canje(user_id, personaje, tipo_sancion) -> str:
     return ""
 
 async def _notificar_usuario(guild, user_id, embed):
-    """Intenta enviar DM al usuario de forma segura."""
+    """Intenta enviar DM al usuario de forma segura. Usa get_member sin fetch para no bloquear."""
     try:
-        member = guild.get_member(user_id)
-        if not member:
-            member = await guild.fetch_member(user_id)
+        member = guild.get_member(int(user_id))
         if member:
             await member.send(embed=embed)
+        else:
+            # fallback: fetch asíncrono solo si no está en caché
+            try:
+                member = await guild.fetch_member(int(user_id))
+                await member.send(embed=embed)
+            except Exception:
+                pass
     except Exception as e:
         print(f"[PCA] DM error para {user_id}: {e}")
 
@@ -367,9 +372,8 @@ class PCA(commands.Cog):
             await interaction.response.send_message(
                 f"❌ {usuario.display_name} no tiene personajes estudiantes.", ephemeral=True); return
 
-        # Detención de profesor → requiere aprobación
+        # Calcular requiere_aprobacion ANTES del defer (accede a interaction.user.roles)
         requiere_aprobacion = (_es_solo_profesor(interaction) and tipo == "detencion")
-        # Expulsión → siempre requiere aprobación del Staff antes de ejecutar
         if tipo == "expulsion":
             requiere_aprobacion = True
 
@@ -398,26 +402,23 @@ class PCA(commands.Cog):
 
     @app_commands.command(name="ver-pc",
         description="Ver el balance de PC y sanciones activas de un estudiante.")
-    @app_commands.describe(usuario="(Opcional) Usuario a consultar — vacío para verte a ti mismo")
+    @app_commands.describe(usuario="El usuario a consultar (puedes mencionarte a ti mismo)")
     @app_commands.guilds(discord.Object(id=GUILD_ID))
     async def ver_pc(self, interaction: discord.Interaction,
-                     usuario: discord.Member | None = None):
-        target = usuario if usuario else interaction.user
-        if usuario and usuario.id != interaction.user.id and not _tiene_autoridad(interaction):
+                     usuario: discord.Member):
+        if usuario.id != interaction.user.id and not _tiene_autoridad(interaction):
             await interaction.response.send_message("❌ Sin autoridad para ver PC de otros.", ephemeral=True); return
 
-        # FIX: obtener estudiantes directamente sin fetch_member
-        estudiantes = _get_estudiantes(target.id)
+        estudiantes = _get_estudiantes(usuario.id)
         if not estudiantes:
             await interaction.response.send_message(
-                f"❌ {'Tú no tienes' if not usuario else target.display_name + ' no tiene'} "
-                f"personajes estudiantes registrados.", ephemeral=True); return
+                f"❌ {usuario.display_name} no tiene personajes estudiantes registrados.", ephemeral=True); return
 
         await interaction.response.defer(ephemeral=True)
-        view = _VerPCView(target_id=target.id, target_name=target.display_name,
-                          target_avatar=str(target.display_avatar.url), personajes=estudiantes)
+        view = _VerPCView(target_id=usuario.id, target_name=usuario.display_name,
+                          target_avatar=str(usuario.display_avatar.url), personajes=estudiantes)
         await interaction.followup.send(
-            embed=discord.Embed(title=f"🎓 Ver PC — {target.display_name}", color=COLOR_INFO,
+            embed=discord.Embed(title=f"🎓 Ver PC — {usuario.display_name}", color=COLOR_INFO,
                 description="Selecciona el personaje a consultar:"),
             view=view, ephemeral=True)
 
@@ -425,26 +426,23 @@ class PCA(commands.Cog):
 
     @app_commands.command(name="historial-pc",
         description="Ver el historial de PC de un personaje estudiante.")
-    @app_commands.describe(usuario="(Opcional) Usuario a consultar — vacío para verte a ti mismo")
+    @app_commands.describe(usuario="El usuario a consultar (puedes mencionarte a ti mismo)")
     @app_commands.guilds(discord.Object(id=GUILD_ID))
     async def historial_pc(self, interaction: discord.Interaction,
-                            usuario: discord.Member | None = None):
-        target = usuario if usuario else interaction.user
-        if usuario and usuario.id != interaction.user.id and not _tiene_autoridad(interaction):
+                            usuario: discord.Member):
+        if usuario.id != interaction.user.id and not _tiene_autoridad(interaction):
             await interaction.response.send_message("❌ Sin autoridad.", ephemeral=True); return
 
-        # FIX: obtener estudiantes directamente
-        estudiantes = _get_estudiantes(target.id)
+        estudiantes = _get_estudiantes(usuario.id)
         if not estudiantes:
             await interaction.response.send_message(
-                f"❌ {'Tú no tienes' if not usuario else target.display_name + ' no tiene'} "
-                f"personajes estudiantes registrados.", ephemeral=True); return
+                f"❌ {usuario.display_name} no tiene personajes estudiantes registrados.", ephemeral=True); return
 
         await interaction.response.defer(ephemeral=True)
-        view = _HistorialPCView(target_id=target.id, target_name=target.display_name,
-                                target_avatar=str(target.display_avatar.url), personajes=estudiantes)
+        view = _HistorialPCView(target_id=usuario.id, target_name=usuario.display_name,
+                                target_avatar=str(usuario.display_avatar.url), personajes=estudiantes)
         await interaction.followup.send(
-            embed=discord.Embed(title=f"📋 Historial PC — {target.display_name}", color=COLOR_INFO,
+            embed=discord.Embed(title=f"📋 Historial PC — {usuario.display_name}", color=COLOR_INFO,
                 description="Selecciona el personaje:"),
             view=view, ephemeral=True)
 
