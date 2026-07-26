@@ -378,7 +378,8 @@ class PCA(commands.Cog):
         if tipo == "expulsion":
             requiere_aprobacion = True
 
-        await interaction.response.defer(ephemeral=False)
+        # Defer ephemeral=True siempre — evita el problema de "la app no respondió"
+        await interaction.response.defer(ephemeral=True)
         nombre_tipo = {"castigo_menor":"⚠️ Castigo Menor","detencion":"🔒 Detención",
                        "suspension":"🚫 Suspensión","expulsion":"💀 Expulsión"}.get(tipo, tipo)
         view = _AplicarSancionView(
@@ -397,7 +398,7 @@ class PCA(commands.Cog):
         await interaction.followup.send(
             embed=discord.Embed(title=f"Aplicar sanción — {nombre_tipo}",
                                 color=COLOR_RECHAZADO, description=desc),
-            view=view)
+            view=view, ephemeral=True)
 
     # ── /ver-pc ───────────────────────────────
 
@@ -410,12 +411,15 @@ class PCA(commands.Cog):
         if usuario.id != interaction.user.id and not _tiene_autoridad(interaction):
             await interaction.response.send_message("❌ Sin autoridad para ver PC de otros.", ephemeral=True); return
 
+        # Defer PRIMERO — Sheets puede tardar más de 3s y Discord cancela la interacción
+        await interaction.response.defer(ephemeral=True)
+
         estudiantes = _get_estudiantes(usuario.id)
         if not estudiantes:
-            await interaction.response.send_message(
-                f"❌ {usuario.display_name} no tiene personajes estudiantes registrados.", ephemeral=True); return
+            await interaction.followup.send(
+                f"❌ {usuario.display_name} no tiene personajes estudiantes registrados.",
+                ephemeral=True); return
 
-        await interaction.response.defer(ephemeral=True)
         view = _VerPCView(target_id=usuario.id, target_name=usuario.display_name,
                           target_avatar=str(usuario.display_avatar.url), personajes=estudiantes)
         await interaction.followup.send(
@@ -434,12 +438,15 @@ class PCA(commands.Cog):
         if usuario.id != interaction.user.id and not _tiene_autoridad(interaction):
             await interaction.response.send_message("❌ Sin autoridad.", ephemeral=True); return
 
+        # Defer PRIMERO — Sheets puede tardar más de 3s y Discord cancela la interacción
+        await interaction.response.defer(ephemeral=True)
+
         estudiantes = _get_estudiantes(usuario.id)
         if not estudiantes:
-            await interaction.response.send_message(
-                f"❌ {usuario.display_name} no tiene personajes estudiantes registrados.", ephemeral=True); return
+            await interaction.followup.send(
+                f"❌ {usuario.display_name} no tiene personajes estudiantes registrados.",
+                ephemeral=True); return
 
-        await interaction.response.defer(ephemeral=True)
         view = _HistorialPCView(target_id=usuario.id, target_name=usuario.display_name,
                                 target_avatar=str(usuario.display_avatar.url), personajes=estudiantes)
         await interaction.followup.send(
