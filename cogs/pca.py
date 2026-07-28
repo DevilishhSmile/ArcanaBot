@@ -34,10 +34,22 @@ def _es_solo_profesor(interaction: discord.Interaction) -> bool:
     return tiene_prof and not tiene_staff
 
 def _get_estudiantes(user_id: int) -> list[str]:
+    """Versión síncrona — solo usar fuera de comandos slash."""
     try:
         return [p["personaje"] for p in get_personajes_usuario(user_id)
                 if p["tipo"] == "estudiante"]
     except Exception:
+        return []
+
+async def _get_estudiantes_async(bot, user_id: int) -> list[str]:
+    """Versión async — usar en comandos slash para no bloquear el event loop."""
+    import asyncio
+    loop = asyncio.get_event_loop()
+    try:
+        result = await loop.run_in_executor(None, get_personajes_usuario, user_id)
+        return [p["personaje"] for p in result if p["tipo"] == "estudiante"]
+    except Exception as e:
+        print(f"[PCA] _get_estudiantes_async: {e}")
         return []
 
 async def _log(bot, titulo: str, descripcion: str, color=None, footer: str = ""):
@@ -260,12 +272,11 @@ class PCA(commands.Cog):
                 color=COLOR_PENDIENTE))
             return
 
-        estudiantes = _get_estudiantes(usuario.id)
-        if not estudiantes:
-            await interaction.response.send_message(
-                f"❌ {usuario.display_name} no tiene personajes estudiantes.", ephemeral=True); return
-
         await interaction.response.defer(ephemeral=True)
+        estudiantes = await _get_estudiantes_async(self.bot, usuario.id)
+        if not estudiantes:
+            await interaction.followup.send(
+                f"❌ {usuario.display_name} no tiene personajes estudiantes.", ephemeral=True); return
         motivo_c = f"Nota académica {nota_f} — {motivo}"
         view = _AsignarPCView(user_id=usuario.id, username=str(usuario),
                                usuario_mention=usuario.mention, personajes=estudiantes,
@@ -293,12 +304,11 @@ class PCA(commands.Cog):
                 f"❌ PC directos entre {PC_TRABAJO_SUCIO_MIN} y {PC_TRABAJO_SUCIO_MAX}.", ephemeral=True); return
         if not any(r.id == ROL_ESTUDIANTE for r in usuario.roles):
             await interaction.response.send_message(f"❌ {usuario.display_name} no es Estudiante.", ephemeral=True); return
-        estudiantes = _get_estudiantes(usuario.id)
-        if not estudiantes:
-            await interaction.response.send_message(
-                f"❌ {usuario.display_name} no tiene personajes estudiantes.", ephemeral=True); return
-
         await interaction.response.defer(ephemeral=True)
+        estudiantes = await _get_estudiantes_async(self.bot, usuario.id)
+        if not estudiantes:
+            await interaction.followup.send(
+                f"❌ {usuario.display_name} no tiene personajes estudiantes.", ephemeral=True); return
         motivo_c = f"Trabajo Sucio (Consejo) — {motivo}"
         view = _AsignarPCView(user_id=usuario.id, username=str(usuario),
                                usuario_mention=usuario.mention, personajes=estudiantes,
@@ -368,18 +378,16 @@ class PCA(commands.Cog):
             await interaction.response.send_message(
                 "❌ No puedes aplicarte una sanción a ti mismo.", ephemeral=True); return
 
-        estudiantes = _get_estudiantes(usuario.id)
-        if not estudiantes:
-            await interaction.response.send_message(
-                f"❌ {usuario.display_name} no tiene personajes estudiantes.", ephemeral=True); return
-
         # Calcular requiere_aprobacion ANTES del defer (accede a interaction.user.roles)
         requiere_aprobacion = (_es_solo_profesor(interaction) and tipo == "detencion")
         if tipo == "expulsion":
             requiere_aprobacion = True
 
-        # Defer ephemeral=True siempre — evita el problema de "la app no respondió"
         await interaction.response.defer(ephemeral=True)
+        estudiantes = await _get_estudiantes_async(self.bot, usuario.id)
+        if not estudiantes:
+            await interaction.followup.send(
+                f"❌ {usuario.display_name} no tiene personajes estudiantes.", ephemeral=True); return
         nombre_tipo = {"castigo_menor":"⚠️ Castigo Menor","detencion":"🔒 Detención",
                        "suspension":"🚫 Suspensión","expulsion":"💀 Expulsión"}.get(tipo, tipo)
         view = _AplicarSancionView(
@@ -411,10 +419,8 @@ class PCA(commands.Cog):
         if usuario.id != interaction.user.id and not _tiene_autoridad(interaction):
             await interaction.response.send_message("❌ Sin autoridad para ver PC de otros.", ephemeral=True); return
 
-        # Defer PRIMERO — Sheets puede tardar más de 3s y Discord cancela la interacción
         await interaction.response.defer(ephemeral=True)
-
-        estudiantes = _get_estudiantes(usuario.id)
+        estudiantes = await _get_estudiantes_async(self.bot, usuario.id)
         if not estudiantes:
             await interaction.followup.send(
                 f"❌ {usuario.display_name} no tiene personajes estudiantes registrados.",
@@ -438,10 +444,8 @@ class PCA(commands.Cog):
         if usuario.id != interaction.user.id and not _tiene_autoridad(interaction):
             await interaction.response.send_message("❌ Sin autoridad.", ephemeral=True); return
 
-        # Defer PRIMERO — Sheets puede tardar más de 3s y Discord cancela la interacción
         await interaction.response.defer(ephemeral=True)
-
-        estudiantes = _get_estudiantes(usuario.id)
+        estudiantes = await _get_estudiantes_async(self.bot, usuario.id)
         if not estudiantes:
             await interaction.followup.send(
                 f"❌ {usuario.display_name} no tiene personajes estudiantes registrados.",
@@ -460,13 +464,12 @@ class PCA(commands.Cog):
         description="Canjear tus PC para reducir una sanción activa.")
     @app_commands.guilds(discord.Object(id=GUILD_ID))
     async def canjear_pc(self, interaction: discord.Interaction):
-        # FIX: usar interaction.user directamente
-        estudiantes = _get_estudiantes(interaction.user.id)
+        await interaction.response.defer(ephemeral=True)
+        estudiantes = await _get_estudiantes_async(self.bot, interaction.user.id)
         if not estudiantes:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "❌ No tienes personajes estudiantes registrados.", ephemeral=True); return
 
-        await interaction.response.defer(ephemeral=True)
         view = _CanjeSelectPersonajeView(user_id=interaction.user.id,
                                           personajes=estudiantes, bot=self.bot)
         await interaction.followup.send(
@@ -484,11 +487,11 @@ class PCA(commands.Cog):
                                        usuario: discord.Member):
         if not _tiene_autoridad(interaction):
             await interaction.response.send_message("❌ Sin autoridad.", ephemeral=True); return
-        estudiantes = _get_estudiantes(usuario.id)
-        if not estudiantes:
-            await interaction.response.send_message(
-                f"❌ {usuario.display_name} no tiene personajes estudiantes.", ephemeral=True); return
         await interaction.response.defer(ephemeral=True)
+        estudiantes = await _get_estudiantes_async(self.bot, usuario.id)
+        if not estudiantes:
+            await interaction.followup.send(
+                f"❌ {usuario.display_name} no tiene personajes estudiantes.", ephemeral=True); return
         view = _MarcarCumplidaSelectView(user_id=usuario.id, personajes=estudiantes,
                                           marcado_por=str(interaction.user), bot=self.bot)
         await interaction.followup.send(
@@ -505,11 +508,11 @@ class PCA(commands.Cog):
     async def limpiar_sanciones(self, interaction: discord.Interaction, usuario: discord.Member):
         if not _es_staff(interaction):
             await interaction.response.send_message("❌ Solo el Staff puede.", ephemeral=True); return
-        estudiantes = _get_estudiantes(usuario.id)
-        if not estudiantes:
-            await interaction.response.send_message(
-                f"❌ {usuario.display_name} no tiene personajes estudiantes.", ephemeral=True); return
         await interaction.response.defer(ephemeral=True)
+        estudiantes = await _get_estudiantes_async(self.bot, usuario.id)
+        if not estudiantes:
+            await interaction.followup.send(
+                f"❌ {usuario.display_name} no tiene personajes estudiantes.", ephemeral=True); return
         view = _LimpiarSancionesView(user_id=usuario.id, personajes=estudiantes,
                                       staff_name=str(interaction.user), bot=self.bot)
         await interaction.followup.send(
@@ -534,11 +537,11 @@ class PCA(commands.Cog):
         if modo == "personaje":
             if not usuario:
                 await interaction.response.send_message("❌ Debes indicar `usuario`.", ephemeral=True); return
-            estudiantes = _get_estudiantes(usuario.id)
-            if not estudiantes:
-                await interaction.response.send_message(
-                    f"❌ {usuario.display_name} no tiene personajes estudiantes.", ephemeral=True); return
             await interaction.response.defer(ephemeral=True)
+            estudiantes = await _get_estudiantes_async(self.bot, usuario.id)
+            if not estudiantes:
+                await interaction.followup.send(
+                    f"❌ {usuario.display_name} no tiene personajes estudiantes.", ephemeral=True); return
             view = _LimpiarPCPersonajeView(user_id=usuario.id, personajes=estudiantes,
                                             staff_name=str(interaction.user), bot=self.bot)
             await interaction.followup.send(
@@ -559,11 +562,11 @@ class PCA(commands.Cog):
         description="Apelar una suspensión o expulsión de uno de tus personajes.")
     @app_commands.guilds(discord.Object(id=GUILD_ID))
     async def apelar(self, interaction: discord.Interaction):
-        estudiantes = _get_estudiantes(interaction.user.id)
-        if not estudiantes:
-            await interaction.response.send_message(
-                "❌ No tienes personajes estudiantes registrados.", ephemeral=True); return
         await interaction.response.defer(ephemeral=True)
+        estudiantes = await _get_estudiantes_async(self.bot, interaction.user.id)
+        if not estudiantes:
+            await interaction.followup.send(
+                "❌ No tienes personajes estudiantes registrados.", ephemeral=True); return
         view = _ApelarSelectView(user_id=interaction.user.id, personajes=estudiantes, bot=self.bot)
         await interaction.followup.send(
             embed=discord.Embed(title="⚖️ Apelar sanción", color=COLOR_INFO,
