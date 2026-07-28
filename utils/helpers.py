@@ -59,6 +59,7 @@ def format_student_sheet_parte1(data: dict) -> str:
         f"⊹ ࣪ ˖           __{data['personaje']}__ ✶  __{data['edad']}__ ˚. ᵎᵎ\n"
         f"⊹ ࣪ ˖           __{data['especie']}__ ✶  __{data['pronouns']}__ ˚. ᵎᵎ\n"
         f"⊹ ࣪ ˖           __{data['elemento']}__ ✶ __{clubes}__ ˚. ᵎᵎ\n"
+        f"⊹ ࣪ ˖           __Casa {data.get('casa','No especificada')}__ ˚. ᵎᵎ\n"
         "︶⊹︶︶⠀𖥔  ︶︶⊹︶\n"
         f"⊹ ࣪ ˖  **Poderes/Habilidades;** {data['habilidades']}\n"
         f"⊹ ࣪ ˖  **Debilidades;** {data['debilidades']}\n"
@@ -85,6 +86,7 @@ def format_teacher_sheet_parte1(data: dict) -> str:
         f"⊹ ࣪ ˖           __{data['personaje']}__ ✶  __{data['edad']}__ ˚. ᵎᵎ\n"
         f"⊹ ࣪ ˖           __{data['especie']}__ ✶  __{data['pronouns']}__ ˚. ᵎᵎ\n"
         f"⊹ ࣪ ˖           __{data['elemento']}__ ✶ __{data['clase']}__ ˚. ᵎᵎ\n"
+        f"⊹ ࣪ ˖           __Casa {data.get('casa','No especificada')}__ ˚. ᵎᵎ\n"
         "︶⊹︶︶⠀𖥔  ︶︶⊹︶\n"
         f"⊹ ࣪ ˖  **Poderes/Habilidades;** {data['habilidades']}\n"
         f"⊹ ࣪ ˖  **Debilidades;** {data['debilidades']}\n"
@@ -111,6 +113,7 @@ def format_worker_sheet_parte1(data: dict) -> str:
         f"⊹ ࣪ ˖           __{data['personaje']}__ ✶  __{data['edad']}__ ˚. ᵎᵎ\n"
         f"⊹ ࣪ ˖           __{data['especie']}__ ✶  __{data['pronouns']}__ ˚. ᵎᵎ\n"
         f"⊹ ࣪ ˖           __{data['elemento']}__ ✶ __{data['cargo']}__ ˚. ᵎᵎ\n"
+        f"⊹ ࣪ ˖           __Casa {data.get('casa','No especificada')}__ ˚. ᵎᵎ\n"
         "︶⊹︶︶⠀𖥔  ︶︶⊹︶\n"
         f"⊹ ࣪ ˖  **Poderes/Habilidades;** {data['habilidades']}\n"
         f"⊹ ࣪ ˖  **Debilidades;** {data['debilidades']}\n"
@@ -198,6 +201,7 @@ def build_review_embed(tipo: str, data: dict, color=None) -> discord.Embed:
     embed.add_field(name="Pronombres", value=data.get("pronouns","—"), inline=True)
     embed.add_field(name="Especie",    value=data.get("especie","—"),  inline=True)
     embed.add_field(name="Elemento",   value=data.get("elemento","—"), inline=True)
+    embed.add_field(name="Casa",       value=data.get("casa","—"),    inline=True)
 
     if tipo == "profesor":
         embed.add_field(name="Clase",  value=data.get("clase","—"), inline=True)

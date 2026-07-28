@@ -5,7 +5,7 @@ from discord.ext import commands
 from utils.constants import (
     GUILD_ID, CANAL_REGISTRO_TRABAJOS, CANAL_CARTA_ACEPTACION,
     CANAL_FICHAS_TRABAJADORES, ROL_STAFF, ROL_TRABAJADOR, ROL_REGISTRADO,
-    get_slots_config, COLOR_APROBADO, COLOR_RECHAZADO, CARGOS,
+    get_slots_config, COLOR_APROBADO, COLOR_RECHAZADO, CARGOS, CASAS,
 )
 from utils.helpers import (
     is_valid_character_name, clean_field, default_if_empty,
@@ -88,11 +88,11 @@ class TrabajadorModal1(discord.ui.Modal, title="🧑‍💼 Ficha de Trabajador 
         _guardar_temp(interaction.client, interaction.user.id, {
             "personaje": clean_field(nombre), "edad": clean_field(self.edad.value),
             "pronouns": clean_field(self.pronouns.value), "especie": clean_field(self.especie.value),
-            "elemento": clean_field(self.elemento.value), "cargo": self.cargo, "usar_slot_extra": False,
+            "elemento": clean_field(self.elemento.value), "cargo": self.cargo, "usar_slot_extra": False, "casa": "",
         })
         await interaction.response.send_message(
-            "✅ **Parte 1 recibida.** Presiona para continuar.",
-            view=ContinuarModal2View(interaction.user.id), ephemeral=True)
+            "✅ **Parte 1 recibida.**\n\n🏠 Selecciona la **casa** de tu personaje:",
+            view=CasaSelectTrabajadorView(interaction.user.id), ephemeral=True)
 
 
 # ── MODAL PARTE 2 ─────────────────────────────
@@ -169,6 +169,31 @@ class TrabajadorModal3(discord.ui.Modal, title="🧑‍💼 Ficha de Trabajador 
 
 
 # ── VIEWS ─────────────────────────────────────
+
+
+class CasaSelectTrabajadorView(discord.ui.View):
+    def __init__(self, user_id):
+        super().__init__(timeout=300)
+        self.user_id = user_id
+        select = discord.ui.Select(
+            placeholder="🏠 Selecciona la casa del personaje...",
+            options=[discord.SelectOption(label=c, value=c, emoji="🏠") for c in CASAS],
+            min_values=1, max_values=1,
+        )
+        select.callback = self._on_select
+        self.add_item(select)
+
+    async def _on_select(self, interaction: discord.Interaction):
+        datos = _obtener_temp(interaction.client, self.user_id)
+        if datos:
+            datos["casa"] = interaction.data["values"][0]
+            _guardar_temp(interaction.client, self.user_id, datos)
+        await interaction.response.edit_message(
+            content=f"✅ **Casa:** {interaction.data['values'][0]}\n\nPresiona para continuar.",
+            view=ContinuarModal2View(self.user_id),
+        )
+        self.stop()
+
 
 class ContinuarModal2View(discord.ui.View):
     def __init__(self, user_id):

@@ -51,6 +51,14 @@ COLOR_INFO       = 0xA569BD
 COLOR_ACEPTACION = 0x9B59B6
 
 # =============================================
+# CASAS — EDITAR AQUÍ si cambian
+# Las 4 casas de la Academia Arcana Isefora
+# El personaje elige su casa al registrarse
+# basándose en el cuestionario de personalidad
+# =============================================
+CASAS = ["Redmeadow", "Ledacrealis", "Rongshakti", "Acrom"]
+
+# =============================================
 # CARGOS — EDITAR AQUÍ
 # =============================================
 CARGOS = {
