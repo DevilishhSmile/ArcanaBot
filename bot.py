@@ -253,6 +253,7 @@ async def load_cogs():
         "cogs.trabajos",
         "cogs.editar_ficha",
         "cogs.pca",
+        "cogs.pca_test",
     ]
     for cog in cogs:
         try:
