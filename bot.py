@@ -73,6 +73,8 @@ async def on_message(message: discord.Message):
         await _procesar_edicion(message, data, "profesor")
     elif tipo == "editar_trabajador":
         await _procesar_edicion(message, data, "trabajador")
+    elif tipo == "generar_id":
+        await _procesar_generar_id(message, data, imagenes)
 
 
 # ──────────────────────────────────────────────
@@ -155,6 +157,44 @@ async def _procesar_trabajador(message, data):
     canal = bot.get_channel(CANAL_REVISION_FICHAS)
     if canal:
         await canal.send(embed=build_review_embed("trabajador", data), view=TrabajadorReviewView(data=data))
+
+
+# ──────────────────────────────────────────────
+# PROCESADOR DE ID
+# ──────────────────────────────────────────────
+
+async def _procesar_generar_id(message, data, imagenes):
+    from cogs.generar_id import _generar_y_enviar, _descargar_imagen
+    import asyncio
+
+    user_id  = message.author.id
+    foto_url = imagenes[0] if imagenes else None
+
+    if not hasattr(bot, "_id_temp"):
+        bot._id_temp = {}
+    temp = bot._id_temp.get(user_id, {})
+    temp["foto_url"]  = foto_url
+    temp["personaje"] = data.get("personaje", {})
+    bot._id_temp[user_id] = temp
+
+    # Crear interaction-like para _generar_y_enviar
+    class FakeInteraction:
+        client  = bot
+        channel = message.channel
+        user    = message.author
+        class response:
+            @staticmethod
+            async def defer(ephemeral=False): pass
+        class followup:
+            @staticmethod
+            async def send(*args, **kwargs):
+                return await message.channel.send(*args, **kwargs)
+
+    fi = FakeInteraction()
+    fi.response  = FakeInteraction.response
+    fi.followup  = FakeInteraction.followup
+
+    await _generar_y_enviar(fi, user_id)
 
 
 # ──────────────────────────────────────────────
@@ -253,7 +293,7 @@ async def load_cogs():
         "cogs.trabajos",
         "cogs.editar_ficha",
         "cogs.pca",
-        "cogs.pca_test",
+        "cogs.generar_id",
     ]
     for cog in cogs:
         try:
