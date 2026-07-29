@@ -109,13 +109,13 @@ def _get_siguiente_codigo(tipo: str) -> str:
         import random
         return f"ISE-{gen_str}-{tipo_str}-{random.randint(1000,9999)}"
 
-def _registrar_codigo(codigo: str, user_id: int, personaje: str, tipo: str):
-    """Guarda el código generado en Sheets."""
+def _registrar_codigo(codigo: str, user_id: int, personaje: str, tipo: str, foto_url: str = ""):
+    """Guarda el código generado en Sheets, incluyendo la URL de la foto."""
     from utils.sheets import get_sheet
     try:
         get_sheet("CodigosID").append_row(
             [codigo, str(user_id), personaje, tipo,
-             datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
+             datetime.now().strftime("%Y-%m-%d %H:%M:%S"), foto_url],
             value_input_option="USER_ENTERED")
     except Exception as e:
         print(f"[ID] Error registrando código: {e}")

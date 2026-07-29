@@ -194,6 +194,7 @@ def build_review_embed(tipo: str, data: dict, color=None) -> discord.Embed:
     embed.add_field(name="Personaje", value=data.get("personaje","—"), inline=True)
 
     if tipo == "uniforme":
+        embed.add_field(name="Casa", value=data.get("casa","—"), inline=True)
         if data.get("imagen"): embed.set_image(url=data["imagen"])
         return embed
 
@@ -264,4 +265,9 @@ def build_acceptance_embed(tipo: str, personaje: str, user_id: int,
             ),
             inline=False
         )
+    embed.add_field(
+        name="​",
+        value=f"*¡Bienvenido/a a Isefora, <@{user_id}>!*",
+        inline=False
+    )
     return embed

@@ -67,12 +67,12 @@ def _get_ids_usuario(user_id: int) -> list[dict]:
 def _get_imagen_id(codigo: str) -> bytes | None:
     """
     Regenera la imagen del ID a partir del código.
-    Busca los datos del personaje en Sheets y genera la imagen.
+    Usa la foto_url guardada en CodigosID si existe.
     """
     from utils.sheets import get_sheet, get_personajes_usuario
-    from cogs.generar_id import _generar_id_imagen, GEN_SERVIDOR, GENERACION_ACTUAL
+    from cogs.generar_id import _generar_id_imagen, _descargar_imagen, GEN_SERVIDOR, GENERACION_ACTUAL
     from datetime import datetime
-    import io
+    import asyncio, io
 
     try:
         # Buscar datos del código en CodigosID
@@ -81,19 +81,16 @@ def _get_imagen_id(codigo: str) -> bytes | None:
         if not fila:
             return None
 
-        user_id  = int(fila.get("user_id", 0))
+        user_id          = int(fila.get("user_id", 0))
         personaje_nombre = fila.get("personaje", "")
-        tipo     = fila.get("tipo", "estudiante")
+        tipo             = fila.get("tipo", "estudiante")
+        foto_url         = fila.get("foto_url", "")
 
         # Buscar datos completos del personaje
         personajes = get_personajes_usuario(user_id)
         personaje  = next(
             (p for p in personajes if p["personaje"].strip().lower() == personaje_nombre.strip().lower()),
-            None)
-
-        if not personaje:
-            # Datos mínimos si no se encuentra
-            personaje = {"personaje": personaje_nombre, "tipo": tipo}
+            None) or {"personaje": personaje_nombre, "tipo": tipo}
 
         # Formatear fecha
         fecha_raw = fila.get("fecha", "") or personaje.get("fecha_aprobacion", "")
@@ -117,7 +114,17 @@ def _get_imagen_id(codigo: str) -> bytes | None:
             "codigo_id":     codigo,
         }
 
-        buffer = _generar_id_imagen(datos_id, None)  # sin foto para /ver-id
+        # Descargar foto si hay URL guardada
+        foto_img = None
+        if foto_url:
+            try:
+                loop = asyncio.new_event_loop()
+                foto_img = loop.run_until_complete(_descargar_imagen(foto_url))
+                loop.close()
+            except Exception as e:
+                print(f"[VER_ID] No se pudo descargar foto: {e}")
+
+        buffer = _generar_id_imagen(datos_id, foto_img)
         return buffer.read()
 
     except Exception as e:

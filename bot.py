@@ -232,9 +232,9 @@ async def _procesar_generar_id(message, data, imagenes):
     # Generar imagen
     buffer = await loop.run_in_executor(None, _generar_id_imagen, datos, foto_img)
 
-    # Registrar código
+    # Registrar código con foto_url para poder regenerar el ID después
     await loop.run_in_executor(
-        None, _registrar_codigo, codigo, user_id, datos["personaje"], tipo)
+        None, _registrar_codigo, codigo, user_id, datos["personaje"], tipo, foto_url or "")
 
     # Enviar al canal
     archivo = discord.File(buffer, filename=f"ID_{datos['personaje'].replace(' ','_')}.png")
@@ -411,9 +411,10 @@ async def _generar_id_al_aprobar(guild, user_id: int, data: dict) -> discord.Fil
         # Generar imagen
         buffer = await loop.run_in_executor(None, _generar_id_imagen, datos_id, foto_img)
 
-        # Registrar código
+        # Registrar código con foto_url
         await loop.run_in_executor(
-            None, _registrar_codigo, codigo, user_id, data.get("personaje",""), "estudiante")
+            None, _registrar_codigo, codigo, user_id,
+            data.get("personaje",""), "estudiante", foto_url or "")
 
         nombre_archivo = f"ID_{data.get('personaje','personaje').replace(' ','_')}.png"
         return discord.File(buffer, filename=nombre_archivo), codigo
