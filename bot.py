@@ -108,6 +108,13 @@ async def _procesar_estudiante(message, data):
     from cogs.admin import cargar_generacion
 
     gen = cargar_generacion()
+
+    # Guardar todas las imágenes en data para el ID y la ficha
+    if not data.get("imagenes"):
+        data["imagenes"] = []
+    if data.get("imagen") and data["imagen"] not in data["imagenes"]:
+        data["imagenes"].insert(0, data["imagen"])
+
     confirm = discord.Embed(title="🎓 Ficha enviada a revisión",
         description=f"**Personaje:** {data['personaje']}\nEl staff revisará pronto. ✨",
         color=COLOR_PENDIENTE)
@@ -345,6 +352,7 @@ async def load_cogs():
         "cogs.editar_ficha",
         "cogs.pca",
         "cogs.generar_id",
+        "cogs.ver_id",
     ]
     for cog in cogs:
         try:
@@ -352,6 +360,67 @@ async def load_cogs():
             print(f"✅ Cog cargado: {cog}")
         except Exception as e:
             print(f"❌ Error cargando {cog}: {e}")
+
+
+async def _generar_id_al_aprobar(guild, user_id: int, data: dict) -> discord.File | None:
+    """
+    Genera el ID automáticamente al aprobar una ficha de estudiante.
+    Usa la primera imagen de la ficha como foto del ID.
+    Retorna un discord.File listo para enviar, o None si falla.
+    """
+    from cogs.generar_id import (
+        _generar_id_imagen, _get_siguiente_codigo,
+        _registrar_codigo, _descargar_imagen, GEN_SERVIDOR, GENERACION_ACTUAL
+    )
+    import asyncio
+    from datetime import datetime
+
+    try:
+        loop = asyncio.get_event_loop()
+
+        # Foto: primera imagen de la ficha
+        foto_img  = None
+        foto_url  = data.get("imagen") or (data.get("imagenes", [None])[0] if data.get("imagenes") else None)
+        if foto_url:
+            foto_img = await _descargar_imagen(foto_url)
+
+        # Formatear fecha
+        fecha_ingreso = datetime.now().strftime("%d/%m/%Y")
+
+        # Clubes para mostrar
+        clubes = data.get("clubes_nombres", [])
+        if isinstance(clubes, list):
+            clubes_str = ", ".join(clubes) if clubes else "Ninguno"
+        else:
+            clubes_str = clubes or "Ninguno"
+
+        datos_id = {
+            "personaje":     data.get("personaje", "—"),
+            "elemento":      data.get("elemento", "—") or "—",
+            "especie":       data.get("especie", "—") or "—",
+            "generacion":    GENERACION_ACTUAL,
+            "casa":          data.get("casa", "—") or "—",
+            "fecha_ingreso": fecha_ingreso,
+            "cargo_display": clubes_str,
+        }
+
+        # Generar código
+        codigo = await loop.run_in_executor(None, _get_siguiente_codigo, "estudiante")
+        datos_id["codigo_id"] = codigo
+
+        # Generar imagen
+        buffer = await loop.run_in_executor(None, _generar_id_imagen, datos_id, foto_img)
+
+        # Registrar código
+        await loop.run_in_executor(
+            None, _registrar_codigo, codigo, user_id, data.get("personaje",""), "estudiante")
+
+        nombre_archivo = f"ID_{data.get('personaje','personaje').replace(' ','_')}.png"
+        return discord.File(buffer, filename=nombre_archivo), codigo
+
+    except Exception as e:
+        print(f"[BOT] Error generando ID al aprobar: {e}")
+        return None, None
 
 async def main():
     async with bot:

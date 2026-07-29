@@ -218,9 +218,11 @@ class ClubesSelectView(discord.ui.View):
         await interaction.response.edit_message(
             content=(
                 f"✅ **Clubes:** {clubs_txt}\n\n"
-                f"📎 Último paso — **envía la imagen de tu personaje en este canal**.\n"
+                f"📎 Último paso — **envía la(s) imagen(es) de tu personaje en este canal**.\n"
                 f"Pégala 📋 o adjúntala desde tu galería 🖼️\n\n"
-                f"*Puedes adjuntar varias imágenes en el mismo mensaje.*\n"
+                f"🪪 **La primera imagen que adjuntes** será usada automáticamente "
+                f"para generar tu **ID de estudiante** al ser aprobado.\n"
+                f"Las demás también aparecerán en tu ficha con normalidad.\n\n"
                 f"*Escribe `sin imagen` si no tienes una.*"
             ),
             view=None)
@@ -344,7 +346,24 @@ class EstudianteReviewView(discord.ui.View):
         canal_carta = interaction.client.get_channel(CANAL_CARTA_ACEPTACION)
         if canal_carta:
             conteo = await get_conteo_usuario(user_id, gen)
-            await canal_carta.send(embed=build_acceptance_embed("estudiante", self.data["personaje"], user_id, conteo, gen))
+            carta_embed = build_acceptance_embed("estudiante", self.data["personaje"], user_id, conteo, gen)
+
+            # Generar ID automáticamente con la primera imagen de la ficha
+            try:
+                from bot import _generar_id_al_aprobar
+                archivo_id, codigo_id = await _generar_id_al_aprobar(
+                    interaction.guild, user_id, self.data)
+                if archivo_id:
+                    carta_embed.add_field(
+                        name="🪪 Tu ID de estudiante",
+                        value="Código: `" + str(codigo_id) + "`\nGuárdalo — es tu identificación oficial en Isefora.",
+                        inline=False)
+                    await canal_carta.send(embed=carta_embed, file=archivo_id)
+                else:
+                    await canal_carta.send(embed=carta_embed)
+            except Exception as e:
+                print(f"[ESTUDIANTES] Error generando ID: {e}")
+                await canal_carta.send(embed=carta_embed)
 
         updated = discord.Embed(title="🎓 Ficha Estudiante — APROBADA ✅",
             description=f"**Personaje:** {self.data['personaje']}\n**Usuario:** <@{user_id}>", color=COLOR_APROBADO)
