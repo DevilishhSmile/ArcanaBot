@@ -43,6 +43,48 @@ GEN_SERVIDOR = GENERACION_ACTUAL + 3  # Gen 1 bot = Gen 4 servidor
 # HELPERS
 # ──────────────────────────────────────────────
 
+
+def _get_datos_completos_estudiante(user_id: int, personaje: str) -> dict:
+    """Busca los datos completos de un estudiante en EstudiantesAprobados."""
+    from utils.sheets import get_sheet
+    try:
+        rows = get_sheet("EstudiantesAprobados").get_all_records()
+        for r in rows:
+            if (str(r.get("user_id","")) == str(user_id) and
+                    r.get("personaje","").strip().lower() == personaje.strip().lower()):
+                return r
+    except Exception as e:
+        print(f"[ID] _get_datos_completos_estudiante: {e}")
+    return {}
+
+def _get_datos_completos_profesor(user_id: int, personaje: str) -> dict:
+    """Busca los datos completos de un profesor en Profesores."""
+    from utils.sheets import get_sheet
+    try:
+        rows = get_sheet("Profesores").get_all_records()
+        for r in rows:
+            if (str(r.get("user_id","")) == str(user_id) and
+                    r.get("personaje","").strip().lower() == personaje.strip().lower() and
+                    r.get("estado","").upper() == "APROBADO"):
+                return r
+    except Exception as e:
+        print(f"[ID] _get_datos_completos_profesor: {e}")
+    return {}
+
+def _get_datos_completos_trabajador(user_id: int, personaje: str) -> dict:
+    """Busca los datos completos de un trabajador en Trabajadores."""
+    from utils.sheets import get_sheet
+    try:
+        rows = get_sheet("Trabajadores").get_all_records()
+        for r in rows:
+            if (str(r.get("user_id","")) == str(user_id) and
+                    r.get("personaje","").strip().lower() == personaje.strip().lower() and
+                    r.get("estado","").upper() == "APROBADO"):
+                return r
+    except Exception as e:
+        print(f"[ID] _get_datos_completos_trabajador: {e}")
+    return {}
+
 def _get_siguiente_codigo(tipo: str) -> str:
     """Genera el código secuencial ISE-GEN-TIPO-NNNN."""
     from utils.sheets import get_sheet

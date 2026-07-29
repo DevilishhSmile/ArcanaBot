@@ -183,19 +183,52 @@ async def _procesar_generar_id(message, data, imagenes):
     if foto_url:
         foto_img = await _descargar_imagen(foto_url)
 
-    # Datos del personaje
+    # Buscar datos completos en Sheets según el tipo
+    tipo = personaje.get("tipo", "estudiante")
+    nombre_personaje = personaje.get("personaje", "—")
+
+    from cogs.generar_id import (
+        _get_datos_completos_estudiante,
+        _get_datos_completos_profesor,
+        _get_datos_completos_trabajador,
+    )
+
+    if tipo == "estudiante":
+        ficha = await loop.run_in_executor(
+            None, _get_datos_completos_estudiante, user_id, nombre_personaje)
+    elif tipo == "profesor":
+        ficha = await loop.run_in_executor(
+            None, _get_datos_completos_profesor, user_id, nombre_personaje)
+    else:
+        ficha = await loop.run_in_executor(
+            None, _get_datos_completos_trabajador, user_id, nombre_personaje)
+
+    # Combinar datos de la ficha completa con los del personaje
+    fecha_raw = ficha.get("fecha", "") or personaje.get("fecha_aprobacion", "")
+    if fecha_raw:
+        try:
+            # Intentar formatear si viene en formato YYYY-MM-DD
+            from datetime import datetime as dt
+            fecha_ingreso = dt.strptime(fecha_raw[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
+        except Exception:
+            fecha_ingreso = fecha_raw
+    else:
+        fecha_ingreso = datetime.now().strftime("%d/%m/%Y")
+
     datos = {
-        "personaje":     personaje.get("personaje", "—"),
-        "elemento":      personaje.get("elemento", "—"),
-        "especie":       personaje.get("especie", "—"),
+        "personaje":     nombre_personaje,
+        "elemento":      ficha.get("elemento", personaje.get("elemento", "—")),
+        "especie":       ficha.get("especie", personaje.get("especie", "—")),
         "generacion":    GENERACION_ACTUAL,
-        "casa":          personaje.get("casa", "—"),
-        "fecha_ingreso": personaje.get("fecha_aprobacion",
-                         datetime.now().strftime("%d/%m/%Y")),
+        "casa":          ficha.get("casa", personaje.get("casa", "—")),
+        "fecha_ingreso": fecha_ingreso,
+        # Para profesores y trabajadores
+        "materia":       ficha.get("materia", "—"),
+        "cargo":         ficha.get("cargo", "—"),
+        "subcargo":      ficha.get("subcargo (si aplica)", ""),
     }
 
     # Generar código único
-    tipo   = personaje.get("tipo", "estudiante")
     loop   = asyncio.get_event_loop()
     codigo = await loop.run_in_executor(None, _get_siguiente_codigo, tipo)
     datos["codigo_id"] = codigo
