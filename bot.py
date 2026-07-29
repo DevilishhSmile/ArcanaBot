@@ -183,31 +183,14 @@ async def _procesar_generar_id(message, data, imagenes):
     if foto_url:
         foto_img = await _descargar_imagen(foto_url)
 
-    # Buscar datos completos en Sheets según el tipo
-    tipo = personaje.get("tipo", "estudiante")
+    # Los datos ya vienen completos desde get_personajes_usuario (fix en sheets.py)
+    tipo             = personaje.get("tipo", "estudiante")
     nombre_personaje = personaje.get("personaje", "—")
 
-    from cogs.generar_id import (
-        _get_datos_completos_estudiante,
-        _get_datos_completos_profesor,
-        _get_datos_completos_trabajador,
-    )
-
-    if tipo == "estudiante":
-        ficha = await loop.run_in_executor(
-            None, _get_datos_completos_estudiante, user_id, nombre_personaje)
-    elif tipo == "profesor":
-        ficha = await loop.run_in_executor(
-            None, _get_datos_completos_profesor, user_id, nombre_personaje)
-    else:
-        ficha = await loop.run_in_executor(
-            None, _get_datos_completos_trabajador, user_id, nombre_personaje)
-
-    # Combinar datos de la ficha completa con los del personaje
-    fecha_raw = ficha.get("fecha", "") or personaje.get("fecha_aprobacion", "")
+    # Formatear fecha
+    fecha_raw = personaje.get("fecha_aprobacion", "")
     if fecha_raw:
         try:
-            # Intentar formatear si viene en formato YYYY-MM-DD
             from datetime import datetime as dt
             fecha_ingreso = dt.strptime(fecha_raw[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
         except Exception:
@@ -215,17 +198,23 @@ async def _procesar_generar_id(message, data, imagenes):
     else:
         fecha_ingreso = datetime.now().strftime("%d/%m/%Y")
 
+    # Cargo/materia + subcargo para profesores y trabajadores
+    subcargo = personaje.get("subcargo", "").strip()
+    if tipo == "profesor":
+        cargo_display = personaje.get("materia", "—")
+    else:
+        cargo_display = personaje.get("cargo", "—")
+    if subcargo:
+        cargo_display = cargo_display + " / " + subcargo
+
     datos = {
-        "personaje":     nombre_personaje,
-        "elemento":      ficha.get("elemento", personaje.get("elemento", "—")),
-        "especie":       ficha.get("especie", personaje.get("especie", "—")),
-        "generacion":    GENERACION_ACTUAL,
-        "casa":          ficha.get("casa", personaje.get("casa", "—")),
-        "fecha_ingreso": fecha_ingreso,
-        # Para profesores y trabajadores
-        "materia":       ficha.get("materia", "—"),
-        "cargo":         ficha.get("cargo", "—"),
-        "subcargo":      ficha.get("subcargo (si aplica)", ""),
+        "personaje":      nombre_personaje,
+        "elemento":       personaje.get("elemento", "—") or "—",
+        "especie":        personaje.get("especie", "—") or "—",
+        "generacion":     GENERACION_ACTUAL,
+        "casa":           personaje.get("casa", "—") or "—",
+        "fecha_ingreso":  fecha_ingreso,
+        "cargo_display":  cargo_display,
     }
 
     # Generar código único
