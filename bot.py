@@ -164,37 +164,66 @@ async def _procesar_trabajador(message, data):
 # ──────────────────────────────────────────────
 
 async def _procesar_generar_id(message, data, imagenes):
-    from cogs.generar_id import _generar_y_enviar, _descargar_imagen
+    from cogs.generar_id import (
+        _generar_id_imagen, _get_siguiente_codigo,
+        _registrar_codigo, _descargar_imagen, GEN_SERVIDOR, GENERACION_ACTUAL
+    )
     import asyncio
+    from datetime import datetime
+    from utils.constants import COLOR_INFO
 
-    user_id  = message.author.id
-    foto_url = imagenes[0] if imagenes else None
+    user_id   = message.author.id
+    foto_url  = imagenes[0] if imagenes else None
+    personaje = data.get("personaje", {})
 
-    if not hasattr(bot, "_id_temp"):
-        bot._id_temp = {}
-    temp = bot._id_temp.get(user_id, {})
-    temp["foto_url"]  = foto_url
-    temp["personaje"] = data.get("personaje", {})
-    bot._id_temp[user_id] = temp
+    await message.channel.typing()
 
-    # Crear interaction-like para _generar_y_enviar
-    class FakeInteraction:
-        client  = bot
-        channel = message.channel
-        user    = message.author
-        class response:
-            @staticmethod
-            async def defer(ephemeral=False): pass
-        class followup:
-            @staticmethod
-            async def send(*args, **kwargs):
-                return await message.channel.send(*args, **kwargs)
+    # Descargar foto
+    foto_img = None
+    if foto_url:
+        foto_img = await _descargar_imagen(foto_url)
 
-    fi = FakeInteraction()
-    fi.response  = FakeInteraction.response
-    fi.followup  = FakeInteraction.followup
+    # Datos del personaje
+    datos = {
+        "personaje":     personaje.get("personaje", "—"),
+        "elemento":      personaje.get("elemento", "—"),
+        "especie":       personaje.get("especie", "—"),
+        "generacion":    GENERACION_ACTUAL,
+        "casa":          personaje.get("casa", "—"),
+        "fecha_ingreso": personaje.get("fecha_aprobacion",
+                         datetime.now().strftime("%d/%m/%Y")),
+    }
 
-    await _generar_y_enviar(fi, user_id)
+    # Generar código único
+    tipo   = personaje.get("tipo", "estudiante")
+    loop   = asyncio.get_event_loop()
+    codigo = await loop.run_in_executor(None, _get_siguiente_codigo, tipo)
+    datos["codigo_id"] = codigo
+
+    # Generar imagen
+    buffer = await loop.run_in_executor(None, _generar_id_imagen, datos, foto_img)
+
+    # Registrar código
+    await loop.run_in_executor(
+        None, _registrar_codigo, codigo, user_id, datos["personaje"], tipo)
+
+    # Enviar al canal
+    archivo = discord.File(buffer, filename=f"ID_{datos['personaje'].replace(' ','_')}.png")
+    embed = discord.Embed(
+        title=f"🪪 ID Generado — {datos['personaje']}",
+        description=(
+            "**Código:** `" + codigo + "`\n"
+            "**Casa:** " + datos["casa"] + "\n"
+            "**Generación:** Gen " + str(GEN_SERVIDOR)
+        ),
+        color=COLOR_INFO,
+    )
+    embed.set_image(url=f"attachment://ID_{datos['personaje'].replace(' ','_')}.png")
+    await message.channel.send(embed=embed, file=archivo)
+
+    # Limpiar temp
+    if hasattr(bot, "_id_temp"):
+        bot._id_temp.pop(user_id, None)
 
 
 # ──────────────────────────────────────────────
