@@ -229,8 +229,20 @@ async def _procesar_generar_id(message, data, imagenes):
     codigo = await loop.run_in_executor(None, _get_siguiente_codigo, tipo)
     datos["codigo_id"] = codigo
 
-    # Generar imagen
-    buffer = await loop.run_in_executor(None, _generar_id_imagen, datos, foto_img)
+    # Generar imagen según tipo
+    if tipo == "estudiante":
+        buffer = await loop.run_in_executor(None, _generar_id_imagen, datos, foto_img)
+    else:
+        from cogs.generar_id import _generar_worker_imagen
+        # Preparar datos específicos para worker/profesor
+        if tipo == "profesor":
+            datos["cargo_display"]   = "Profesor"
+            datos["subcargo_display"] = personaje.get("materia", "—") or "—"
+        else:
+            datos["cargo_display"]   = personaje.get("cargo", "—") or "—"
+            sub = personaje.get("subcargo", "").strip()
+            datos["subcargo_display"] = sub if sub else "—"
+        buffer = await loop.run_in_executor(None, _generar_worker_imagen, datos, foto_img)
 
     # Registrar código con foto_url para poder regenerar el ID después
     await loop.run_in_executor(
@@ -408,8 +420,19 @@ async def _generar_id_al_aprobar(guild, user_id: int, data: dict) -> discord.Fil
         codigo = await loop.run_in_executor(None, _get_siguiente_codigo, "estudiante")
         datos_id["codigo_id"] = codigo
 
-        # Generar imagen
-        buffer = await loop.run_in_executor(None, _generar_id_imagen, datos_id, foto_img)
+        # Generar imagen según tipo
+        if tipo == "estudiante":
+            buffer = await loop.run_in_executor(None, _generar_id_imagen, datos_id, foto_img)
+        else:
+            from cogs.generar_id import _generar_worker_imagen
+            if tipo == "profesor":
+                datos_id["cargo_display"]    = "Profesor"
+                datos_id["subcargo_display"] = data.get("clase", "—") or "—"
+            else:
+                datos_id["cargo_display"]    = data.get("cargo", "—") or "—"
+                sub = data.get("subcargo", "").strip()
+                datos_id["subcargo_display"] = sub if sub else "—"
+            buffer = await loop.run_in_executor(None, _generar_worker_imagen, datos_id, foto_img)
 
         # Registrar código con foto_url
         await loop.run_in_executor(

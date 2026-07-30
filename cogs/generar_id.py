@@ -39,6 +39,26 @@ COLOR_BARRA = (220, 185, 150)
 # Número real del servidor para mostrar en el ID
 GEN_SERVIDOR = GENERACION_ACTUAL + 3  # Gen 1 bot = Gen 4 servidor
 
+
+# ──────────────────────────────────────────────
+# CONFIGURACIÓN ID TRABAJADOR/PROFESOR
+# Plantilla: IDWorker.png (400x600px)
+# ──────────────────────────────────────────────
+
+PLANTILLA_WORKER_PATH = "IDWorker.png"
+
+POSICIONES_WORKER = {
+    "nombre":        (120, 388),
+    "cargo":         (100, 428),
+    "subcargo":      (220, 462),
+    "fecha_ingreso": (200, 500),
+    "codigo":        (55,  565),
+}
+
+# Zona de la foto en IDWorker
+FOTO_WORKER_X1, FOTO_WORKER_Y1 = 104, 80
+FOTO_WORKER_X2, FOTO_WORKER_Y2 = 295, 350
+
 # ──────────────────────────────────────────────
 # HELPERS
 # ──────────────────────────────────────────────
@@ -119,6 +139,73 @@ def _registrar_codigo(codigo: str, user_id: int, personaje: str, tipo: str, foto
             value_input_option="USER_ENTERED")
     except Exception as e:
         print(f"[ID] Error registrando código: {e}")
+
+def _generar_worker_imagen(data: dict, foto: Image.Image | None) -> io.BytesIO:
+    """
+    Genera el ID para profesores y trabajadores usando IDWorker.png.
+    """
+    import os
+    plantilla_path = PLANTILLA_WORKER_PATH
+    if not os.path.exists(plantilla_path):
+        plantilla_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', PLANTILLA_WORKER_PATH)
+
+    plantilla = Image.open(plantilla_path).convert("RGBA")
+    draw      = ImageDraw.Draw(plantilla)
+
+    try:
+        font_regular = ImageFont.truetype(
+            '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf', 13)
+        font_bold = ImageFont.truetype(
+            '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 13)
+    except Exception:
+        font_regular = ImageFont.load_default()
+        font_bold    = ImageFont.load_default()
+
+    # ── Pegar foto ──────────────────────────────
+    if foto:
+        try:
+            fw = FOTO_WORKER_X2 - FOTO_WORKER_X1
+            fh = FOTO_WORKER_Y2 - FOTO_WORKER_Y1
+            foto_rgb  = foto.convert("RGBA")
+            orig_w, orig_h = foto_rgb.size
+            ratio  = max(fw / orig_w, fh / orig_h)
+            nuevo_w = int(orig_w * ratio)
+            nuevo_h = int(orig_h * ratio)
+            foto_rgb = foto_rgb.resize((nuevo_w, nuevo_h), Image.LANCZOS)
+            left = (nuevo_w - fw) // 2
+            top  = (nuevo_h - fh) // 2
+            foto_rgb = foto_rgb.crop((left, top, left + fw, top + fh))
+            mask = Image.new("L", (fw, fh), 0)
+            ImageDraw.Draw(mask).rounded_rectangle([(0,0),(fw-1,fh-1)], radius=20, fill=255)
+            plantilla.paste(foto_rgb, (FOTO_WORKER_X1, FOTO_WORKER_Y1), mask)
+        except Exception as e:
+            print(f"[ID] Error pegando foto worker: {e}")
+
+    # ── Escribir campos ──────────────────────────
+    COLOR_TEXTO = (130, 80, 50)
+    COLOR_BARRA = (220, 185, 150)
+
+    def _trunc(txt, lim=22):
+        return (txt[:lim-1] + "…") if len(txt) > lim else txt
+
+    textos = [
+        ("nombre",        _trunc(data.get("personaje","—")),      font_regular, COLOR_TEXTO),
+        ("cargo",         _trunc(data.get("cargo_display","—")),  font_regular, COLOR_TEXTO),
+        ("subcargo",      _trunc(data.get("subcargo_display","—")), font_regular, COLOR_TEXTO),
+        ("fecha_ingreso", data.get("fecha_ingreso","—"),           font_regular, COLOR_TEXTO),
+        ("codigo",        data.get("codigo_id","ISE-00-PRF-0000"), font_bold,    COLOR_BARRA),
+    ]
+
+    for campo, texto, font, color in textos:
+        x, y = POSICIONES_WORKER[campo]
+        draw.text((x, y), texto, font=font, fill=color)
+
+    resultado = plantilla.convert("RGB")
+    buffer = io.BytesIO()
+    resultado.save(buffer, format="PNG", optimize=True)
+    buffer.seek(0)
+    return buffer
+
 
 async def _descargar_imagen(url: str) -> Image.Image | None:
     """Descarga una imagen desde una URL de Discord."""
