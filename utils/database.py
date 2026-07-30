@@ -34,27 +34,27 @@ async def _get_o_crear(db, user_id, generacion):
 def _contar_desde_sheets(user_id: int) -> dict:
     """
     Cuenta los personajes reales de un usuario directamente desde Sheets.
-    Retorna dict con estudiantes, profesores, trabajadores.
+    Siempre obtiene datos frescos para evitar caché desactualizado.
     """
-    from utils.sheets import get_all_rows
+    from utils.sheets import get_sheet
     conteo = {"estudiantes": 0, "profesores": 0, "trabajadores": 0}
     try:
-        for r in get_all_rows("EstudiantesAprobados"):
+        for r in get_sheet("EstudiantesAprobados").get_all_records():
             if str(r.get("user_id","")) == str(user_id):
                 conteo["estudiantes"] += 1
     except Exception as e:
         print(f"[DB] Error contando estudiantes: {e}")
     try:
-        for r in get_all_rows("Profesores"):
-            estado = r.get("estado","").strip().upper()
-            if str(r.get("user_id","")) == str(user_id) and                (estado == "APROBADO" or estado == ""):
+        for r in get_sheet("Profesores").get_all_records():
+            estado = str(r.get("estado","")).strip().upper()
+            if str(r.get("user_id","")) == str(user_id) and                estado in ("APROBADO", ""):
                 conteo["profesores"] += 1
     except Exception as e:
         print(f"[DB] Error contando profesores: {e}")
     try:
-        for r in get_all_rows("Trabajadores"):
-            estado = r.get("estado","").strip().upper()
-            if str(r.get("user_id","")) == str(user_id) and                (estado == "APROBADO" or estado == ""):
+        for r in get_sheet("Trabajadores").get_all_records():
+            estado = str(r.get("estado","")).strip().upper()
+            if str(r.get("user_id","")) == str(user_id) and                estado in ("APROBADO", ""):
                 conteo["trabajadores"] += 1
     except Exception as e:
         print(f"[DB] Error contando trabajadores: {e}")

@@ -155,10 +155,13 @@ def _generar_worker_imagen(data: dict, foto: Image.Image | None) -> io.BytesIO:
     try:
         font_regular = ImageFont.truetype(
             '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf', 13)
+        font_small = ImageFont.truetype(
+            '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf', 11)
         font_bold = ImageFont.truetype(
             '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 13)
     except Exception:
         font_regular = ImageFont.load_default()
+        font_small   = ImageFont.load_default()
         font_bold    = ImageFont.load_default()
 
     # ── Pegar foto ──────────────────────────────
@@ -188,12 +191,16 @@ def _generar_worker_imagen(data: dict, foto: Image.Image | None) -> io.BytesIO:
     def _trunc(txt, lim=22):
         return (txt[:lim-1] + "…") if len(txt) > lim else txt
 
+    # Usar fuente pequeña si el subcargo/materia es largo
+    subcargo_txt = data.get("subcargo_display","—")
+    subcargo_font = font_small if len(subcargo_txt) > 20 else font_regular
+
     textos = [
-        ("nombre",        _trunc(data.get("personaje","—")),      font_regular, COLOR_TEXTO),
-        ("cargo",         _trunc(data.get("cargo_display","—")),  font_regular, COLOR_TEXTO),
-        ("subcargo",      _trunc(data.get("subcargo_display","—")), font_regular, COLOR_TEXTO),
-        ("fecha_ingreso", data.get("fecha_ingreso","—"),           font_regular, COLOR_TEXTO),
-        ("codigo",        data.get("codigo_id","ISE-00-PRF-0000"), font_bold,    COLOR_BARRA),
+        ("nombre",        _trunc(data.get("personaje","—"), 24),    font_regular,  COLOR_TEXTO),
+        ("cargo",         _trunc(data.get("cargo_display","—"), 24), font_regular, COLOR_TEXTO),
+        ("subcargo",      _trunc(subcargo_txt, 30),                  subcargo_font, COLOR_TEXTO),
+        ("fecha_ingreso", data.get("fecha_ingreso","—"),             font_regular,  COLOR_TEXTO),
+        ("codigo",        data.get("codigo_id","ISE-00-PRF-0000"),   font_bold,     COLOR_BARRA),
     ]
 
     for campo, texto, font, color in textos:

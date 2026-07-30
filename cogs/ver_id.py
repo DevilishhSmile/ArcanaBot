@@ -131,10 +131,15 @@ def _get_imagen_id(codigo: str) -> bytes | None:
             from cogs.generar_id import _generar_worker_imagen
             if tipo == "profesor":
                 datos_id["cargo_display"]    = "Profesor"
-                datos_id["subcargo_display"] = personaje.get("materia", "—") or "—"
+                # La materia viene como "materia" en get_personajes_usuario
+                materia = (personaje.get("materia") or
+                           personaje.get("detalle") or "—").strip()
+                datos_id["subcargo_display"] = materia if materia else "—"
             else:
-                datos_id["cargo_display"]    = personaje.get("cargo", "—") or "—"
-                sub = personaje.get("subcargo", "").strip()
+                cargo = (personaje.get("cargo") or
+                         personaje.get("detalle") or "—").strip()
+                datos_id["cargo_display"]    = cargo if cargo else "—"
+                sub = (personaje.get("subcargo") or "").strip()
                 datos_id["subcargo_display"] = sub if sub else "—"
             buffer = _generar_worker_imagen(datos_id, foto_img)
         return buffer.read()
