@@ -56,7 +56,7 @@ POSICIONES_WORKER = {
 }
 
 # Zona de la foto en IDWorker
-FOTO_WORKER_X1, FOTO_WORKER_Y1 = 98, 74
+FOTO_WORKER_X1, FOTO_WORKER_Y1 = 98, 68
 FOTO_WORKER_X2, FOTO_WORKER_Y2 = 301, 356
 
 # ──────────────────────────────────────────────

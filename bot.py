@@ -374,7 +374,7 @@ async def load_cogs():
             print(f"❌ Error cargando {cog}: {e}")
 
 
-async def _generar_id_al_aprobar(guild, user_id: int, data: dict) -> discord.File | None:
+async def _generar_id_al_aprobar(guild, user_id: int, data: dict, tipo: str = "estudiante") -> discord.File | None:
     """
     Genera el ID automáticamente al aprobar una ficha de estudiante.
     Usa la primera imagen de la ficha como foto del ID.
@@ -417,7 +417,7 @@ async def _generar_id_al_aprobar(guild, user_id: int, data: dict) -> discord.Fil
         }
 
         # Generar código
-        codigo = await loop.run_in_executor(None, _get_siguiente_codigo, "estudiante")
+        codigo = await loop.run_in_executor(None, _get_siguiente_codigo, tipo)
         datos_id["codigo_id"] = codigo
 
         # Generar imagen según tipo
@@ -437,7 +437,7 @@ async def _generar_id_al_aprobar(guild, user_id: int, data: dict) -> discord.Fil
         # Registrar código con foto_url
         await loop.run_in_executor(
             None, _registrar_codigo, codigo, user_id,
-            data.get("personaje",""), "estudiante", foto_url or "")
+            data.get("personaje",""), tipo, foto_url or "")
 
         nombre_archivo = f"ID_{data.get('personaje','personaje').replace(' ','_')}.png"
         return discord.File(buffer, filename=nombre_archivo), codigo

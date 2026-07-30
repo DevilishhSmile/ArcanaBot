@@ -46,15 +46,15 @@ def _contar_desde_sheets(user_id: int) -> dict:
         print(f"[DB] Error contando estudiantes: {e}")
     try:
         for r in get_all_rows("Profesores"):
-            if str(r.get("user_id","")) == str(user_id) and \
-               r.get("estado","").upper() == "APROBADO":
+            estado = r.get("estado","").strip().upper()
+            if str(r.get("user_id","")) == str(user_id) and                (estado == "APROBADO" or estado == ""):
                 conteo["profesores"] += 1
     except Exception as e:
         print(f"[DB] Error contando profesores: {e}")
     try:
         for r in get_all_rows("Trabajadores"):
-            if str(r.get("user_id","")) == str(user_id) and \
-               r.get("estado","").upper() == "APROBADO":
+            estado = r.get("estado","").strip().upper()
+            if str(r.get("user_id","")) == str(user_id) and                (estado == "APROBADO" or estado == ""):
                 conteo["trabajadores"] += 1
     except Exception as e:
         print(f"[DB] Error contando trabajadores: {e}")

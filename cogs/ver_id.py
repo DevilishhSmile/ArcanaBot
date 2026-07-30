@@ -124,7 +124,19 @@ def _get_imagen_id(codigo: str) -> bytes | None:
             except Exception as e:
                 print(f"[VER_ID] No se pudo descargar foto: {e}")
 
-        buffer = _generar_id_imagen(datos_id, foto_img)
+        # Usar plantilla correcta según tipo
+        if tipo == "estudiante":
+            buffer = _generar_id_imagen(datos_id, foto_img)
+        else:
+            from cogs.generar_id import _generar_worker_imagen
+            if tipo == "profesor":
+                datos_id["cargo_display"]    = "Profesor"
+                datos_id["subcargo_display"] = personaje.get("materia", "—") or "—"
+            else:
+                datos_id["cargo_display"]    = personaje.get("cargo", "—") or "—"
+                sub = personaje.get("subcargo", "").strip()
+                datos_id["subcargo_display"] = sub if sub else "—"
+            buffer = _generar_worker_imagen(datos_id, foto_img)
         return buffer.read()
 
     except Exception as e:

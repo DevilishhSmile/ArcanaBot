@@ -277,7 +277,7 @@ class TrabajadorReviewView(discord.ui.View):
             try:
                 from bot import _generar_id_al_aprobar
                 archivo_id, codigo_id = await _generar_id_al_aprobar(
-                    interaction.guild, user_id, self.data)
+                    interaction.guild, user_id, self.data, "trabajador")
                 if archivo_id:
                     carta_embed.add_field(
                         name="🪪 Tu ID",
