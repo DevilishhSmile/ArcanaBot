@@ -118,11 +118,11 @@ class ProfesorModal1(discord.ui.Modal, title="🧑‍🏫 Ficha de Profesor — 
         _guardar_temp(interaction.client, interaction.user.id, {
             "personaje": clean_field(nombre), "edad": clean_field(self.edad.value),
             "pronouns": clean_field(self.pronouns.value), "especie": clean_field(self.especie.value),
-            "elemento": clean_field(self.elemento.value), "clase": self.materia, "usar_slot_extra": False, "casa": "",
+            "elemento": clean_field(self.elemento.value), "clase": self.materia, "usar_slot_extra": False,
         })
         await interaction.response.send_message(
-            f"✅ **Parte 1** para **{clean_field(nombre)}** — Clase: **{self.materia}**\n\n🏠 Selecciona la **casa** de tu personaje:",
-            view=CasaSelectProfesorView(interaction.user.id), ephemeral=True)
+            f"✅ **Parte 1** para **{clean_field(nombre)}** — Clase: **{self.materia}**\n\nPresiona para continuar.",
+            view=ContinuarModal2View(interaction.user.id), ephemeral=True)
 
 
 # ── MODAL PARTE 2 ─────────────────────────────
@@ -302,7 +302,22 @@ class ProfesorReviewView(discord.ui.View):
         canal_carta = interaction.client.get_channel(CANAL_CARTA_ACEPTACION)
         if canal_carta:
             conteo = await get_conteo_usuario(user_id, gen)
-            await canal_carta.send(embed=build_acceptance_embed("profesor", self.data["personaje"], user_id, conteo, gen))
+            carta_embed = build_acceptance_embed("profesor", self.data["personaje"], user_id, conteo, gen)
+            try:
+                from bot import _generar_id_al_aprobar
+                archivo_id, codigo_id = await _generar_id_al_aprobar(
+                    interaction.guild, user_id, self.data)
+                if archivo_id:
+                    carta_embed.add_field(
+                        name="🪪 Tu ID",
+                        value="Código: `" + str(codigo_id) + "`\nGuárdalo — es tu identificación oficial en Isefora.",
+                        inline=False)
+                    await canal_carta.send(embed=carta_embed, file=archivo_id)
+                else:
+                    await canal_carta.send(embed=carta_embed)
+            except Exception as e:
+                print(f"[PROFESOR] Error generando ID: {e}")
+                await canal_carta.send(embed=carta_embed)
         updated = discord.Embed(title="🧑‍🏫 Ficha Profesor — APROBADA ✅",
             description=f"**Personaje:** {self.data['personaje']}\n**Clase:** {self.data.get('clase','')}\n**Usuario:** <@{user_id}>",
             color=COLOR_APROBADO)
