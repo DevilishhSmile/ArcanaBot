@@ -836,7 +836,6 @@ class Spins(commands.Cog):
 
     @app_commands.command(name="spin-poder",
         description="Genera las estadísticas de poder de uno de tus personajes.")
-    @app_commands.guilds(discord.Object(id=GUILD_ID))
     async def spin_poder(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         personajes = await self._get_personajes_async(interaction.user.id)
@@ -855,7 +854,6 @@ class Spins(commands.Cog):
 
     @app_commands.command(name="editar-ficha-poder",
         description="Edita la ficha de poder de un personaje aprobado.")
-    @app_commands.guilds(discord.Object(id=GUILD_ID))
     async def editar_ficha_poder(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         personajes = await self._get_personajes_async(interaction.user.id)
@@ -873,7 +871,6 @@ class Spins(commands.Cog):
 
     @app_commands.command(name="respin-personaje",
         description="Re-rolea las estadísticas de poder (requiere ítem de re-spin).")
-    @app_commands.guilds(discord.Object(id=GUILD_ID))
     async def respin_personaje(self, interaction: discord.Interaction):
         if not any(r.id == ROL_RESPIN for r in interaction.user.roles):
             await interaction.response.send_message(
@@ -899,7 +896,6 @@ class Spins(commands.Cog):
     @app_commands.command(name="ver-ficha-poder",
         description="Ver la ficha de poder de un personaje. Comando público.")
     @app_commands.describe(usuario="(Opcional) Usuario a consultar")
-    @app_commands.guilds(discord.Object(id=GUILD_ID))
     async def ver_ficha_poder(self, interaction: discord.Interaction,
                                usuario: discord.Member | None = None):
         target = usuario or interaction.user
@@ -960,7 +956,6 @@ class Spins(commands.Cog):
     @batalla_group.command(name="historial",
         description="Ver el historial de batallas de un personaje.")
     @app_commands.describe(usuario="(Opcional) Usuario a consultar")
-    @app_commands.guilds(discord.Object(id=GUILD_ID))
     async def historial_batalla(self, interaction: discord.Interaction,
                                  usuario: discord.Member | None = None):
         target = usuario or interaction.user
