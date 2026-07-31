@@ -333,7 +333,6 @@ async def on_ready():
 
     try:
         synced = await bot.tree.sync(guild=guild)
-        await bot.tree.sync()
         print(f"✅ {len(synced)} comando(s): {[c.name for c in synced]}")
     except Exception as e:
         print(f"❌ Error sincronizando: {e}")
