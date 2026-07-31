@@ -825,13 +825,6 @@ class Spins(commands.Cog):
             print(f"[SPINS] Error obteniendo personajes de {user_id}: {e}")
             return []
 
-    # Grupo de batalla — cuenta como 1 comando en el límite de Discord
-    batalla_group = app_commands.Group(
-        name="batalla",
-        description="Sistema de batallas entre personajes.",
-        guild_ids=[GUILD_ID]
-    )
-
     # ── /spin-poder ───────────────────────────
 
     @app_commands.command(name="spin-poder",
@@ -918,8 +911,9 @@ class Spins(commands.Cog):
 
     # ── /batalla ──────────────────────────────
 
-    @batalla_group.command(name="iniciar",
+    @app_commands.command(name="batalla",
         description="Iniciar una batalla contra otro personaje.")
+    @app_commands.guilds(discord.Object(id=GUILD_ID))
     @app_commands.describe(rival="El usuario rival")
     async def batalla(self, interaction: discord.Interaction, rival: discord.Member):
         if rival.id == interaction.user.id:
@@ -953,8 +947,9 @@ class Spins(commands.Cog):
 
     # ── /historial-batalla ────────────────────
 
-    @batalla_group.command(name="historial",
+    @app_commands.command(name="historial-batalla",
         description="Ver el historial de batallas de un personaje.")
+    @app_commands.guilds(discord.Object(id=GUILD_ID))
     @app_commands.describe(usuario="(Opcional) Usuario a consultar")
     async def historial_batalla(self, interaction: discord.Interaction,
                                  usuario: discord.Member | None = None):
@@ -1030,8 +1025,9 @@ class SeleccionarPersonajeBatallaView(discord.ui.View):
 
     # ── /tirada-batalla ───────────────────────
 
-    @batalla_group.command(name="tirada",
+    @app_commands.command(name="tirada-batalla",
         description="Realizar una tirada de movimiento en una batalla activa.")
+    @app_commands.guilds(discord.Object(id=GUILD_ID))
     async def tirada_batalla(self, interaction: discord.Interaction):
         if not hasattr(self.bot, "_batallas"):
             self.bot._batallas = {}
@@ -1083,8 +1079,9 @@ class SeleccionarPersonajeBatallaView(discord.ui.View):
 
     # ── /terminar-batalla ─────────────────────
 
-    @batalla_group.command(name="terminar",
+    @app_commands.command(name="terminar-batalla",
         description="Terminar la batalla activa y registrar el resultado.")
+    @app_commands.guilds(discord.Object(id=GUILD_ID))
     @app_commands.describe(ganador="El personaje ganador de la batalla")
     async def terminar_batalla(self, interaction: discord.Interaction, ganador: str):
         if not hasattr(self.bot, "_batallas"):
