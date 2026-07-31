@@ -1027,85 +1027,6 @@ class SeleccionarPersonajeBatallaView(discord.ui.View):
         self.stop()
 
 
-class SeleccionarRivalView(discord.ui.View):
-    def __init__(self, user_id, mi_personaje, mi_ficha, rival,
-                 personajes_rival, bot, canal_id):
-        super().__init__(timeout=120)
-        self.user_id      = user_id
-        self.mi_personaje = mi_personaje
-        self.mi_ficha     = mi_ficha
-        self.rival        = rival
-        self.bot          = bot
-        self.canal_id     = canal_id
-
-        options = [
-            discord.SelectOption(label=p["personaje"], value=p["personaje"],
-                description=p["tipo"].capitalize())
-            for p in personajes_rival
-        ]
-        select = discord.ui.Select(
-            placeholder=f"🎭 Personaje de {rival.display_name}...", options=options)
-        select.callback = self._on_select
-        self.add_item(select)
-
-    async def _on_select(self, interaction: discord.Interaction):
-        rival_personaje = interaction.data["values"][0]
-        loop = asyncio.get_event_loop()
-
-        rival_ficha = await loop.run_in_executor(None, _get_ficha_poder,
-            self.rival.id, rival_personaje)
-        if not rival_ficha or rival_ficha.get("estado","").upper() != "APROBADO":
-            await interaction.response.edit_message(
-                content=f"❌ **{rival_personaje}** no tiene ficha de poder aprobada.",
-                embed=None, view=None); return
-
-        # Calcular porcentajes
-        mi_nivel    = {"bajo": 1, "medio": 2, "alto": 3}.get(self.mi_ficha.get("nivel","bajo"), 1)
-        rival_nivel = {"bajo": 1, "medio": 2, "alto": 3}.get(rival_ficha.get("nivel","bajo"), 1)
-        mi_mana     = int(self.mi_ficha.get("mana", 0))
-        rival_mana  = int(rival_ficha.get("mana", 0))
-
-        mi_score    = mi_nivel * 3 + mi_mana
-        rival_score = rival_nivel * 3 + rival_mana
-        total       = mi_score + rival_score
-
-        if total == 0:
-            mi_pct = rival_pct = 50
-        else:
-            mi_pct    = round((mi_score / total) * 100)
-            rival_pct = 100 - mi_pct
-
-        # Guardar batalla activa en el bot
-        if not hasattr(self.bot, "_batallas"):
-            self.bot._batallas = {}
-        self.bot._batallas[f"{self.user_id}_{self.rival.id}"] = {
-            "user_id": self.user_id, "mi_personaje": self.mi_personaje,
-            "mi_pct": mi_pct, "rival_id": self.rival.id,
-            "rival_personaje": rival_personaje, "rival_pct": rival_pct,
-        }
-
-        # Publicar en el canal
-        canal = self.bot.get_channel(self.canal_id)
-        if canal:
-            embed = discord.Embed(
-                title=f"⚔️ Batalla — {self.mi_personaje} vs {rival_personaje}",
-                description=(
-                    f"**{self.mi_personaje}** (<@{self.user_id}>) "
-                    f"desafía a **{rival_personaje}** (<@{self.rival.id}>)\n\n"
-                    f"Probabilidades de acierto:\n"
-                    f"🔵 **{self.mi_personaje}:** {mi_pct}%\n"
-                    f"🔴 **{rival_personaje}:** {rival_pct}%\n\n"
-                    f"*Usa `/tirada-batalla` para cada movimiento durante el rol.*"
-                ),
-                color=COLOR_INFO
-            )
-            await canal.send(embed=embed)
-
-        await interaction.response.edit_message(
-            content="⚔️ ¡Batalla iniciada! Ve al canal para continuar.",
-            embed=None, view=None)
-        self.stop()
-
 
     # ── /tirada-batalla ───────────────────────
 
@@ -1214,6 +1135,86 @@ class SeleccionarRivalView(discord.ui.View):
         )
         await interaction.response.send_message(embed=embed)
 
+
+
+class SeleccionarRivalView(discord.ui.View):
+    def __init__(self, user_id, mi_personaje, mi_ficha, rival,
+                 personajes_rival, bot, canal_id):
+        super().__init__(timeout=120)
+        self.user_id      = user_id
+        self.mi_personaje = mi_personaje
+        self.mi_ficha     = mi_ficha
+        self.rival        = rival
+        self.bot          = bot
+        self.canal_id     = canal_id
+
+        options = [
+            discord.SelectOption(label=p["personaje"], value=p["personaje"],
+                description=p["tipo"].capitalize())
+            for p in personajes_rival
+        ]
+        select = discord.ui.Select(
+            placeholder=f"🎭 Personaje de {rival.display_name}...", options=options)
+        select.callback = self._on_select
+        self.add_item(select)
+
+    async def _on_select(self, interaction: discord.Interaction):
+        rival_personaje = interaction.data["values"][0]
+        loop = asyncio.get_event_loop()
+
+        rival_ficha = await loop.run_in_executor(None, _get_ficha_poder,
+            self.rival.id, rival_personaje)
+        if not rival_ficha or rival_ficha.get("estado","").upper() != "APROBADO":
+            await interaction.response.edit_message(
+                content=f"❌ **{rival_personaje}** no tiene ficha de poder aprobada.",
+                embed=None, view=None); return
+
+        # Calcular porcentajes
+        mi_nivel    = {"bajo": 1, "medio": 2, "alto": 3}.get(self.mi_ficha.get("nivel","bajo"), 1)
+        rival_nivel = {"bajo": 1, "medio": 2, "alto": 3}.get(rival_ficha.get("nivel","bajo"), 1)
+        mi_mana     = int(self.mi_ficha.get("mana", 0))
+        rival_mana  = int(rival_ficha.get("mana", 0))
+
+        mi_score    = mi_nivel * 3 + mi_mana
+        rival_score = rival_nivel * 3 + rival_mana
+        total       = mi_score + rival_score
+
+        if total == 0:
+            mi_pct = rival_pct = 50
+        else:
+            mi_pct    = round((mi_score / total) * 100)
+            rival_pct = 100 - mi_pct
+
+        # Guardar batalla activa en el bot
+        if not hasattr(self.bot, "_batallas"):
+            self.bot._batallas = {}
+        self.bot._batallas[f"{self.user_id}_{self.rival.id}"] = {
+            "user_id": self.user_id, "mi_personaje": self.mi_personaje,
+            "mi_pct": mi_pct, "rival_id": self.rival.id,
+            "rival_personaje": rival_personaje, "rival_pct": rival_pct,
+        }
+
+        # Publicar en el canal
+        canal = self.bot.get_channel(self.canal_id)
+        if canal:
+            embed = discord.Embed(
+                title=f"⚔️ Batalla — {self.mi_personaje} vs {rival_personaje}",
+                description=(
+                    f"**{self.mi_personaje}** (<@{self.user_id}>) "
+                    f"desafía a **{rival_personaje}** (<@{self.rival.id}>)\n\n"
+                    f"Probabilidades de acierto:\n"
+                    f"🔵 **{self.mi_personaje}:** {mi_pct}%\n"
+                    f"🔴 **{rival_personaje}:** {rival_pct}%\n\n"
+                    f"*Usa `/tirada-batalla` para cada movimiento durante el rol.*"
+                ),
+                color=COLOR_INFO
+            )
+            await canal.send(embed=embed)
+
+        await interaction.response.edit_message(
+            content="⚔️ ¡Batalla iniciada! Ve al canal para continuar.",
+            embed=None, view=None)
+        self.stop()
 
 async def setup(bot):
     await bot.add_cog(Spins(bot))
