@@ -130,11 +130,17 @@ def _get_historial_batallas(user_id: int, personaje: str) -> list:
 # ──────────────────────────────────────────────
 
 def _hacer_spin() -> dict:
-    nivel = random.choice(["bajo", "bajo", "medio", "medio", "medio", "alto"])
-    mana  = random.randint(0, 10)
+    # Solo nivel y maná — la categoría la asigna el staff al revisar
+    nivel = random.choices(
+        ["bajo", "medio", "alto"],
+        weights=[50, 35, 15],
+        k=1
+    )[0]
+    mana = random.randint(0, 10)
     return {"nivel": nivel, "mana": mana}
 
 def _build_spin_embed(spin: dict, personaje: str = "") -> discord.Embed:
+    """Embed que ve el usuario — sin categoría de raza (es secreta hasta aprobación)."""
     nivel_data = NIVELES_PODER[spin["nivel"]]
     mana       = spin["mana"]
     mana_desc  = DESCRIPCIONES_MANA.get(mana, "")
@@ -145,16 +151,35 @@ def _build_spin_embed(spin: dict, personaje: str = "") -> discord.Embed:
         "El velo entre mundos se ha abierto para revelar tu destino...",
         "La academia ha tomado nota de tu potencial...",
         "Los antiguos han deliberado sobre tu naturaleza...",
+        "El tejido del maná se ha alineado para revelarte...",
+        "Isefora ha leído tu origen en las estrellas del archipiélago...",
     ]
 
     embed = discord.Embed(
-        title=f"✨ Resultado del Spin de Poder",
+        title="✨ Resultado del Spin de Poder",
         description=f"*{random.choice(mensajes_inmersivos)}*",
         color=COLOR_INFO
     )
     if personaje:
         embed.add_field(name="Personaje", value=f"**{personaje}**", inline=False)
 
+    embed.add_field(
+        name=f"{nivel_data['emoji']} Nivel de Poder",
+        value=f"**{nivel_data['nombre']}**\n*{nivel_data['desc']}*",
+        inline=True
+    )
+    embed.add_field(
+        name="💧 Poder de Maná",
+        value=f"**{mana}/10**\n*{mana_desc}*",
+        inline=True
+    )
+    embed.add_field(
+        name="🔍 Categoría de Raza",
+        value="*Pendiente de revisión del staff...*",
+        inline=False
+    )
+    embed.set_footer(text="Completa tu ficha de poder con el botón de abajo.")
+    return embed
     embed.add_field(
         name=f"{nivel_data['emoji']} Nivel de Poder",
         value=f"**{nivel_data['nombre']}**\n*{nivel_data['desc']}*",
@@ -402,17 +427,16 @@ class FichaPodeReviewView(discord.ui.View):
 
 
 class AprobarFichaPodeModal(discord.ui.Modal, title="✅ Aprobar Ficha de Poder"):
-    categoria = discord.ui.Select if False else None  # workaround — usar TextInput
 
     categoria_input = discord.ui.TextInput(
-        label="Categoría de raza (basica/intermedia/divina)",
-        placeholder="basica, intermedia o divina",
+        label="Categoría de raza a asignar",
+        placeholder="basico | sensitivo | epico | mitico | legendario | maldito | divino",
         min_length=4, max_length=12,
     )
     notas = discord.ui.TextInput(
         label="Notas para el usuario (opcional)",
         style=discord.TextStyle.paragraph,
-        placeholder="Comentarios sobre la aprobación...",
+        placeholder="Comentarios, correcciones o contexto para el usuario...",
         required=False, max_length=500,
     )
 
@@ -428,24 +452,29 @@ class AprobarFichaPodeModal(discord.ui.Modal, title="✅ Aprobar Ficha de Poder"
     async def on_submit(self, interaction: discord.Interaction):
         cat_raw = self.categoria_input.value.strip().lower()
         if cat_raw not in CATEGORIAS_RAZA:
+            guia = "\n".join(
+                f"{v['emoji']} `{k}` — {v['nombre']}: {v['desc']}"
+                for k, v in CATEGORIAS_RAZA.items()
+            )
             await interaction.response.send_message(
-                "❌ Categoría inválida. Usa: `basica`, `intermedia` o `divina`.",
+                f"❌ Categoría inválida. Las opciones son:\n{guia}",
                 ephemeral=True)
             return
 
-        cat_display = CATEGORIAS_RAZA[cat_raw]
+        cat_data    = CATEGORIAS_RAZA[cat_raw]
+        cat_display = f"{cat_data['emoji']} {cat_data['nombre']}"
         loop        = asyncio.get_event_loop()
         await loop.run_in_executor(None, _actualizar_estado_ficha,
             self.user_id, self.personaje, "APROBADO",
             str(interaction.user), cat_raw, 0)
 
-        # Actualizar mensaje de revisión
+        # Actualizar mensaje del panel de staff
         embed = discord.Embed(
-            title=f"✨ Ficha de Poder — APROBADA ✅",
+            title="✨ Ficha de Poder — APROBADA ✅",
             description=(
                 f"**Personaje:** {self.personaje}\n"
                 f"**Usuario:** <@{self.user_id}>\n"
-                f"**Categoría:** {cat_display}"
+                f"**Categoría asignada:** {cat_display}"
             ),
             color=COLOR_APROBADO
         )
@@ -453,19 +482,23 @@ class AprobarFichaPodeModal(discord.ui.Modal, title="✅ Aprobar Ficha de Poder"
         await self.message.edit(embed=embed, view=None)
         await interaction.response.send_message("✅ Aprobado.", ephemeral=True)
 
-        # DM al usuario
+        # DM al usuario con toda la info completa
         try:
             member = self.guild.get_member(self.user_id) or \
                      await self.guild.fetch_member(self.user_id)
             nivel_data = NIVELES_PODER[self.nivel]
+            mana_desc  = DESCRIPCIONES_MANA.get(self.mana, "")
             dm_embed = discord.Embed(
                 title="✨ ¡Tu Ficha de Poder fue aprobada!",
                 description=(
                     f"Tu personaje **{self.personaje}** tiene ahora una ficha de poder oficial.\n\n"
-                    f"**Categoría de raza:** {cat_display}\n"
-                    f"**Nivel:** {nivel_data['emoji']} {nivel_data['nombre']}\n"
-                    f"**Maná:** {self.mana}/10\n\n"
-                    f"{('**Notas del Staff:** ' + self.notas.value) if self.notas.value else ''}"
+                    f"**{cat_data['emoji']} Categoría de Raza:** {cat_data['nombre']}\n"
+                    f"*{cat_data['desc']}*\n\n"
+                    f"**{nivel_data['emoji']} Nivel de Poder:** {nivel_data['nombre']}\n"
+                    f"*{nivel_data['desc']}*\n\n"
+                    f"**💧 Poder de Maná:** {self.mana}/10\n"
+                    f"*{mana_desc}*"
+                    + (f"\n\n**📝 Notas del Staff:**\n{self.notas.value}" if self.notas.value else "")
                 ),
                 color=COLOR_APROBADO
             )
@@ -664,7 +697,8 @@ def _build_ficha_embed(ficha: dict, personaje: str) -> discord.Embed:
     nivel      = ficha.get("nivel", "bajo")
     mana       = int(ficha.get("mana", 0))
     cat_key    = ficha.get("categoria_raza", ficha.get("categoria", ""))
-    cat_display = CATEGORIAS_RAZA.get(cat_key, cat_key or "Sin asignar")
+    cat_info   = CATEGORIAS_RAZA.get(cat_key)
+    cat_display = f"{cat_info['emoji']} {cat_info['nombre']}" if cat_info else (cat_key or "Sin asignar")
     nivel_data = NIVELES_PODER.get(nivel, NIVELES_PODER["bajo"])
 
     embed = discord.Embed(

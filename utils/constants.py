@@ -250,9 +250,48 @@ ROL_RESPIN = 1221473426573889699  # Rol de re-spin de tienda
 
 # Categorías de raza (asignadas por el staff al aprobar)
 CATEGORIAS_RAZA = {
-    "basica":     "⚪ Básica",
-    "intermedia": "🟡 Intermedia",
-    "divina":     "🔴 Divina",
+    "basico": {
+        "nombre": "Básico",
+        "emoji":  "⚪",
+        "desc":   "Humanos con chispa mágica, especies con sensibilidad elemental mínima, seres contemporáneos que despiertan al mundo mágico.",
+        "peso":   40,  # probabilidad relativa en el spin
+    },
+    "sensitivo": {
+        "nombre": "Sensitivo",
+        "emoji":  "🔵",
+        "desc":   "Brujos de linaje menor, seres con sangre mágica diluida, especies con dones sensoriales sobrenaturales pasivos (aura, clarividencia, presencia mágica).",
+        "peso":   25,
+    },
+    "epico": {
+        "nombre": "Épico",
+        "emoji":  "🟢",
+        "desc":   "Mutantes, hibridaciones entre especies, seres cuya magia nació de una alteración de su forma original.",
+        "peso":   15,
+    },
+    "mitico": {
+        "nombre": "Mítico",
+        "emoji":  "🟡",
+        "desc":   "Seres de fantasía clásica con magia propia. Goblins, Orcos, Elfos, Hadas y todo tipo de criatura fantasiosa.",
+        "peso":   10,
+    },
+    "legendario": {
+        "nombre": "Legendario",
+        "emoji":  "🟠",
+        "desc":   "Seres mitológicos de gran poder sin llegar a la divinidad. Fénix, Pegaso, Kraken, Leviatán, Titanes, Gigantes, Kitsune, Ninfas y similares.",
+        "peso":   6,
+    },
+    "maldito": {
+        "nombre": "Maldito",
+        "emoji":  "🔴",
+        "desc":   "Seres marcados por fuerzas oscuras o sobrenaturales. Fantasmas, Yokais, Demonios, Vampiros, seres con castigos divinos, maldiciones y pecados capitales.",
+        "peso":   3,
+    },
+    "divino": {
+        "nombre": "Divino",
+        "emoji":  "✨",
+        "desc":   "Dioses, Ángeles, Seres Bendecidos, Avatares, Posesiones divinas y todo ser con conexión directa o indirecta a lo sagrado.",
+        "peso":   1,
+    },
 }
 
 # Niveles de poder
