@@ -198,18 +198,6 @@ def _build_spin_embed(spin: dict, personaje: str = "") -> discord.Embed:
     )
     embed.set_footer(text="Completa tu ficha de poder con el botón de abajo.")
     return embed
-    embed.add_field(
-        name=f"{nivel_data['emoji']} Nivel de Poder",
-        value=f"**{nivel_data['nombre']}**\n*{nivel_data['desc']}*",
-        inline=True
-    )
-    embed.add_field(
-        name="💧 Poder de Maná",
-        value=f"**{mana}/10**\n*{mana_desc}*",
-        inline=True
-    )
-    embed.set_footer(text="Completa tu ficha de poder con el botón de abajo.")
-    return embed
 
 
 # ──────────────────────────────────────────────
@@ -242,12 +230,21 @@ class FichaPodeModal(discord.ui.Modal, title="✨ Ficha de Poder"):
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
 
-        nivel = self.spin["nivel"]
-        mana  = self.spin["mana"]
+        loop = asyncio.get_event_loop()
+
+        # Si ya existe ficha previa (rechazada), conservar nivel y maná originales
+        ficha_previa = await loop.run_in_executor(None, _get_ficha_poder,
+            interaction.user.id, self.personaje)
+
+        if ficha_previa and not self.es_respin:
+            nivel = ficha_previa.get("nivel_poder", self.spin["nivel"])
+            mana  = int(ficha_previa.get("mana", self.spin["mana"]) or self.spin["mana"])
+        else:
+            nivel = self.spin["nivel"]
+            mana  = self.spin["mana"]
 
         # Guardar en Sheets
         estado = "PENDIENTE"
-        loop   = asyncio.get_event_loop()
         await loop.run_in_executor(None, _guardar_ficha_poder,
             interaction.user.id, str(interaction.user),
             self.personaje, nivel, mana,
@@ -422,12 +419,19 @@ class FichaPodeReviewView(discord.ui.View):
         if not self._es_staff(interaction):
             await interaction.response.send_message("❌ Solo el Staff puede.", ephemeral=True)
             return
-        await interaction.response.send_modal(
-            AprobarFichaPodeModal(
-                user_id=self.user_id, personaje=self.personaje,
-                nivel=self.nivel, mana=self.mana,
-                message=interaction.message, guild=self.guild
-            )
+        # Mostrar selector de categoría antes del modal
+        view = SeleccionarCategoriaView(
+            user_id=self.user_id, personaje=self.personaje,
+            nivel=self.nivel, mana=self.mana,
+            message=interaction.message, guild=self.guild
+        )
+        await interaction.response.send_message(
+            embed=discord.Embed(
+                title="🏷️ Selecciona la Categoría de Raza",
+                description="Elige la categoría que corresponde a este personaje según sus habilidades y debilidades.",
+                color=COLOR_INFO
+            ),
+            view=view, ephemeral=True
         )
 
     @discord.ui.button(label="❌ Rechazar", style=discord.ButtonStyle.danger,
@@ -444,22 +448,11 @@ class FichaPodeReviewView(discord.ui.View):
         )
 
 
-class AprobarFichaPodeModal(discord.ui.Modal, title="✅ Aprobar Ficha de Poder"):
-
-    categoria_input = discord.ui.TextInput(
-        label="Categoría de raza a asignar",
-        placeholder="basico | sensitivo | epico | mitico | legendario | maldito | divino",
-        min_length=4, max_length=12,
-    )
-    notas = discord.ui.TextInput(
-        label="Notas para el usuario (opcional)",
-        style=discord.TextStyle.paragraph,
-        placeholder="Comentarios, correcciones o contexto para el usuario...",
-        required=False, max_length=500,
-    )
+class SeleccionarCategoriaView(discord.ui.View):
+    """Selector desplegable de categoría de raza — solo visible para el staff."""
 
     def __init__(self, user_id, personaje, nivel, mana, message, guild):
-        super().__init__()
+        super().__init__(timeout=120)
         self.user_id   = user_id
         self.personaje = personaje
         self.nivel     = nivel
@@ -467,19 +460,61 @@ class AprobarFichaPodeModal(discord.ui.Modal, title="✅ Aprobar Ficha de Poder"
         self.message   = message
         self.guild     = guild
 
-    async def on_submit(self, interaction: discord.Interaction):
-        cat_raw = self.categoria_input.value.strip().lower()
-        if cat_raw not in CATEGORIAS_RAZA:
-            guia = "\n".join(
-                f"{v['emoji']} `{k}` — {v['nombre']}: {v['desc']}"
-                for k, v in CATEGORIAS_RAZA.items()
+        # Construir opciones del select con descripción de cada categoría
+        opciones = [
+            discord.SelectOption(
+                label=f"{data['emoji']} {data['nombre']}",
+                value=key,
+                description=data["desc"][:100],  # Discord limita a 100 chars
             )
+            for key, data in CATEGORIAS_RAZA.items()
+        ]
+        self.categoria_select.options = opciones
+
+    @discord.ui.select(placeholder="Elige la categoría de raza...")
+    async def categoria_select(self, interaction: discord.Interaction,
+                                select: discord.ui.Select):
+        cat_raw = select.values[0]
+        # Abrir modal de notas con la categoría ya elegida
+        await interaction.response.send_modal(
+            AprobarFichaPodeModal(
+                user_id=self.user_id, personaje=self.personaje,
+                nivel=self.nivel, mana=self.mana,
+                message=self.message, guild=self.guild,
+                categoria_elegida=cat_raw
+            )
+        )
+
+
+class AprobarFichaPodeModal(discord.ui.Modal, title="✅ Aprobar Ficha de Poder"):
+
+    notas = discord.ui.TextInput(
+        label="Notas para el usuario (opcional)",
+        style=discord.TextStyle.paragraph,
+        placeholder="Comentarios, correcciones o contexto para el usuario...",
+        required=False, max_length=500,
+    )
+
+    def __init__(self, user_id, personaje, nivel, mana, message, guild,
+                 categoria_elegida: str = ""):
+        super().__init__()
+        self.user_id           = user_id
+        self.personaje         = personaje
+        self.nivel             = nivel
+        self.mana              = mana
+        self.message           = message
+        self.guild             = guild
+        self.categoria_elegida = categoria_elegida
+
+    async def on_submit(self, interaction: discord.Interaction):
+        cat_raw  = self.categoria_elegida
+        cat_data = CATEGORIAS_RAZA.get(cat_raw)
+        if not cat_data:
             await interaction.response.send_message(
-                f"❌ Categoría inválida. Las opciones son:\n{guia}",
+                "❌ Error interno: categoría no válida. Intenta de nuevo.",
                 ephemeral=True)
             return
 
-        cat_data    = CATEGORIAS_RAZA[cat_raw]
         cat_display = f"{cat_data['emoji']} {cat_data['nombre']}"
         loop        = asyncio.get_event_loop()
         await loop.run_in_executor(None, lambda: _actualizar_estado_ficha(
@@ -581,7 +616,7 @@ class RechazarFichaPodeModal(discord.ui.Modal, title="❌ Rechazar Ficha de Pode
                 description=(
                     f"Tu ficha de poder para **{self.personaje}** fue rechazada.\n\n"
                     f"**Motivo y correcciones:**\n{self.motivo.value}\n\n"
-                    f"Usa `/editar-ficha-poder {self.personaje}` para corregirla. 💪"
+                    f"Usa `/editar-ficha-poder` y selecciona **{self.personaje}** para corregir solo las habilidades y debilidades. 💪\n\n*Tus estadísticas de nivel y maná se mantienen del spin original.*"
                 ),
                 color=COLOR_RECHAZADO
             )
@@ -672,9 +707,9 @@ class SeleccionarPersonajePodeView(discord.ui.View):
         elif self.accion == "editar":
             ficha = await loop.run_in_executor(None, _get_ficha_poder,
                 self.user_id, personaje)
-            if not ficha or ficha.get("estado","").upper() != "APROBADO":
+            if not ficha or ficha.get("estado","").upper() not in ("APROBADO", "RECHAZADO"):
                 await interaction.response.edit_message(
-                    content=f"❌ **{personaje}** no tiene ficha de poder aprobada aún.",
+                    content=f"❌ **{personaje}** no tiene ficha de poder aprobada o en revisión aún.",
                     embed=None, view=None)
                 return
             await interaction.response.send_modal(
@@ -778,7 +813,17 @@ class Spins(commands.Cog):
 
     async def _get_personajes_async(self, user_id: int):
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, get_personajes_usuario, user_id)
+        try:
+            return await asyncio.wait_for(
+                loop.run_in_executor(None, get_personajes_usuario, user_id),
+                timeout=10.0
+            )
+        except asyncio.TimeoutError:
+            print(f"[SPINS] Timeout obteniendo personajes de {user_id}")
+            return []
+        except Exception as e:
+            print(f"[SPINS] Error obteniendo personajes de {user_id}: {e}")
+            return []
 
     # ── /spin-poder ───────────────────────────
 
