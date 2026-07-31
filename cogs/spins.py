@@ -1023,49 +1023,65 @@ class SeleccionarPersonajeBatallaView(discord.ui.View):
 
 
 
-    # ── /tirada-batalla ───────────────────────
 
-    @app_commands.command(name="tirada-batalla",
-        description="Realizar una tirada de movimiento en una batalla activa.")
-    @app_commands.guilds(discord.Object(id=GUILD_ID))
-    async def tirada_batalla(self, interaction: discord.Interaction):
-        if not hasattr(self.bot, "_batallas"):
-            self.bot._batallas = {}
 
-        # Buscar batalla activa del usuario
-        batalla = None
-        clave   = None
-        for k, v in self.bot._batallas.items():
-            if v["user_id"] == interaction.user.id or v["rival_id"] == interaction.user.id:
-                batalla = v
-                clave   = k
-                break
 
+
+
+class BatallaActivaView(discord.ui.View):
+    """Botones que aparecen en el embed de batalla activa."""
+    def __init__(self, bot, clave: str, canal_id: int):
+        super().__init__(timeout=None)
+        self.bot      = bot
+        self.clave    = clave
+        self.canal_id = canal_id
+
+    def _get_batalla(self):
+        return self.bot._batallas.get(self.clave)
+
+    @discord.ui.button(label="⚔️ Tirada", style=discord.ButtonStyle.primary, custom_id="batalla_tirada")
+    async def tirada(self, interaction: discord.Interaction, button: discord.ui.Button):
+        batalla = self._get_batalla()
         if not batalla:
             await interaction.response.send_message(
-                "❌ No tienes una batalla activa. Usa `/batalla` para iniciar una.",
-                ephemeral=True); return
+                "❌ Esta batalla ya terminó.", ephemeral=True); return
 
-        # Determinar si es el retador o el rival
-        es_retador = batalla["user_id"] == interaction.user.id
-        mi_personaje  = batalla["mi_personaje"] if es_retador else batalla["rival_personaje"]
-        mi_pct        = batalla["mi_pct"]        if es_retador else batalla["rival_pct"]
+        # Cualquiera de los dos participantes puede tirar
+        if interaction.user.id not in (batalla["user_id"], batalla["rival_id"]):
+            await interaction.response.send_message(
+                "❌ Solo los participantes pueden tirar.", ephemeral=True); return
 
-        # Tirada
+        es_retador   = interaction.user.id == batalla["user_id"]
+        mi_personaje = batalla["mi_personaje"] if es_retador else batalla["rival_personaje"]
+        mi_pct       = batalla["mi_pct"]       if es_retador else batalla["rival_pct"]
+
         resultado = random.random() * 100
         gana      = resultado <= mi_pct
 
+        mensajes_victoria = [
+            f"El movimiento fue certero, **{mi_personaje}** prevalece.",
+            f"**{mi_personaje}** ejecuta el movimiento a la perfección.",
+            f"La esencia mágica de **{mi_personaje}** responde con fuerza.",
+            f"**{mi_personaje}** logra su cometido con maestría.",
+        ]
+        mensajes_derrota = [
+            f"El movimiento no fue suficiente, **{mi_personaje}** no logra su cometido.",
+            f"**{mi_personaje}** falla en su intento.",
+            f"La defensa fue demasiado fuerte para **{mi_personaje}**.",
+            f"**{mi_personaje}** pierde el hilo del movimiento.",
+        ]
+
         if gana:
-            msg = f"El movimiento fue certero, **{mi_personaje}** prevalece."
+            msg   = random.choice(mensajes_victoria)
             color = COLOR_APROBADO
             emoji = "✅"
         else:
-            msg = f"El movimiento no fue suficiente, **{mi_personaje}** no logra su cometido."
+            msg   = random.choice(mensajes_derrota)
             color = COLOR_RECHAZADO
             emoji = "❌"
 
         embed = discord.Embed(
-            title=f"{emoji} Tirada de Batalla",
+            title=f"{emoji} Tirada — {mi_personaje}",
             description=f"*{msg}*",
             color=color
         )
@@ -1075,41 +1091,92 @@ class SeleccionarPersonajeBatallaView(discord.ui.View):
             inline=False
         )
         embed.set_footer(text=f"Tirada por {interaction.user.display_name}")
-        await interaction.response.send_message(embed=embed)
 
-    # ── /terminar-batalla ─────────────────────
+        # Mantener botones para seguir
+        await interaction.response.send_message(
+            embed=embed,
+            view=BatallaActivaView(self.bot, self.clave, self.canal_id)
+        )
 
-    @app_commands.command(name="terminar-batalla",
-        description="Terminar la batalla activa y registrar el resultado.")
-    @app_commands.guilds(discord.Object(id=GUILD_ID))
-    @app_commands.describe(ganador="El personaje ganador de la batalla")
-    async def terminar_batalla(self, interaction: discord.Interaction, ganador: str):
-        if not hasattr(self.bot, "_batallas"):
-            self.bot._batallas = {}
-
-        batalla = None
-        clave   = None
-        for k, v in self.bot._batallas.items():
-            if v["user_id"] == interaction.user.id or v["rival_id"] == interaction.user.id:
-                batalla = v
-                clave   = k
-                break
-
+    @discord.ui.button(label="🏆 Terminar Batalla", style=discord.ButtonStyle.success, custom_id="batalla_terminar")
+    async def terminar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        batalla = self._get_batalla()
         if not batalla:
             await interaction.response.send_message(
-                "❌ No tienes una batalla activa.", ephemeral=True); return
+                "❌ Esta batalla ya terminó.", ephemeral=True); return
 
-        ganador = ganador.strip()
+        if interaction.user.id not in (batalla["user_id"], batalla["rival_id"]):
+            await interaction.response.send_message(
+                "❌ Solo los participantes pueden terminar la batalla.", ephemeral=True); return
+
         mi_p    = batalla["mi_personaje"]
         rival_p = batalla["rival_personaje"]
 
-        if ganador.lower() not in [mi_p.lower(), rival_p.lower()]:
+        view = SeleccionarGanadorView(
+            bot=self.bot, clave=self.clave,
+            mi_p=mi_p, rival_p=rival_p,
+            user_id=batalla["user_id"], rival_id=batalla["rival_id"]
+        )
+        await interaction.response.send_message(
+            embed=discord.Embed(
+                title="🏆 ¿Quién ganó la batalla?",
+                description=f"Selecciona el personaje ganador:",
+                color=COLOR_INFO
+            ),
+            view=view, ephemeral=True
+        )
+
+    @discord.ui.button(label="🏳️ Cancelar Batalla", style=discord.ButtonStyle.danger, custom_id="batalla_cancelar")
+    async def cancelar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        batalla = self._get_batalla()
+        if not batalla:
             await interaction.response.send_message(
-                f"❌ El ganador debe ser **{mi_p}** o **{rival_p}**.", ephemeral=True); return
+                "❌ Esta batalla ya no existe.", ephemeral=True); return
+
+        if interaction.user.id not in (batalla["user_id"], batalla["rival_id"]):
+            await interaction.response.send_message(
+                "❌ Solo los participantes pueden cancelar.", ephemeral=True); return
+
+        del self.bot._batallas[self.clave]
+        await interaction.response.send_message(
+            embed=discord.Embed(
+                title="🏳️ Batalla cancelada",
+                description="La batalla fue cancelada. No se registrará en el historial.",
+                color=COLOR_RECHAZADO
+            )
+        )
+        self.stop()
+
+
+class SeleccionarGanadorView(discord.ui.View):
+    """Selector de ganador al terminar una batalla."""
+    def __init__(self, bot, clave, mi_p, rival_p, user_id, rival_id):
+        super().__init__(timeout=60)
+        self.bot      = bot
+        self.clave    = clave
+        self.user_id  = user_id
+        self.rival_id = rival_id
+
+        options = [
+            discord.SelectOption(label=mi_p,    value=mi_p,    emoji="🔵"),
+            discord.SelectOption(label=rival_p, value=rival_p, emoji="🔴"),
+        ]
+        select = discord.ui.Select(placeholder="Selecciona el ganador...", options=options)
+        select.callback = self._on_select
+        self.add_item(select)
+
+    async def _on_select(self, interaction: discord.Interaction):
+        batalla = self.bot._batallas.get(self.clave)
+        if not batalla:
+            await interaction.response.edit_message(
+                content="❌ Esta batalla ya no existe.", embed=None, view=None); return
+
+        ganador = interaction.data["values"][0]
+        mi_p    = batalla["mi_personaje"]
+        rival_p = batalla["rival_personaje"]
 
         loop = asyncio.get_event_loop()
-        # Registrar resultado para ambos
-        if ganador.lower() == mi_p.lower():
+        if ganador == mi_p:
             await loop.run_in_executor(None, _registrar_batalla,
                 batalla["user_id"], mi_p, batalla["rival_id"], rival_p, "VICTORIA")
             await loop.run_in_executor(None, _registrar_batalla,
@@ -1120,18 +1187,22 @@ class SeleccionarPersonajeBatallaView(discord.ui.View):
             await loop.run_in_executor(None, _registrar_batalla,
                 batalla["rival_id"], rival_p, batalla["user_id"], mi_p, "VICTORIA")
 
-        del self.bot._batallas[clave]
+        del self.bot._batallas[self.clave]
 
-        embed = discord.Embed(
-            title="⚔️ Batalla terminada",
-            description=(
-                "🏆 **" + ganador + "** ganó la batalla.\n\n"
-                "El resultado ha sido registrado en el historial."
+        await interaction.response.edit_message(
+            embed=discord.Embed(
+                title="⚔️ Batalla finalizada",
+                description=(
+                    f"🏆 **{ganador}** ganó la batalla.
+
+"
+                    f"El resultado ha sido registrado en el historial de ambos personajes."
+                ),
+                color=COLOR_APROBADO
             ),
-            color=COLOR_APROBADO
+            view=None
         )
-        await interaction.response.send_message(embed=embed)
-
+        self.stop()
 
 
 class SeleccionarRivalView(discord.ui.View):
@@ -1202,11 +1273,15 @@ class SeleccionarRivalView(discord.ui.View):
                     f"Probabilidades de acierto:\n"
                     f"🔵 **{self.mi_personaje}:** {mi_pct}%\n"
                     f"🔴 **{rival_personaje}:** {rival_pct}%\n\n"
-                    f"*Usa `/tirada-batalla` para cada movimiento durante el rol.*"
+                    f"*Usa los botones de abajo para realizar tiradas durante el rol.*"
                 ),
                 color=COLOR_INFO
             )
-            await canal.send(embed=embed)
+            clave = f"{self.user_id}_{self.rival.id}"
+            await canal.send(
+                embed=embed,
+                view=BatallaActivaView(self.bot, clave, self.canal_id)
+            )
 
         await interaction.response.edit_message(
             content="⚔️ ¡Batalla iniciada! Ve al canal para continuar.",
