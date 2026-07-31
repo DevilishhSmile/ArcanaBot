@@ -1287,3 +1287,7 @@ class SeleccionarRivalView(discord.ui.View):
             ephemeral=True
         )
         self.stop()
+
+
+async def setup(bot):
+    await bot.add_cog(Spins(bot))
