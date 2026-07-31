@@ -1193,9 +1193,7 @@ class SeleccionarGanadorView(discord.ui.View):
             embed=discord.Embed(
                 title="⚔️ Batalla finalizada",
                 description=(
-                    f"🏆 **{ganador}** ganó la batalla.
-
-"
+                    f"🏆 **{ganador}** ganó la batalla.\n\n"
                     f"El resultado ha sido registrado en el historial de ambos personajes."
                 ),
                 color=COLOR_APROBADO
@@ -1268,24 +1266,12 @@ class SeleccionarRivalView(discord.ui.View):
             embed = discord.Embed(
                 title=f"⚔️ Batalla — {self.mi_personaje} vs {rival_personaje}",
                 description=(
-                    f"**{self.mi_personaje}** (<@{self.user_id}>) "
-                    f"desafía a **{rival_personaje}** (<@{self.rival.id}>)\n\n"
-                    f"Probabilidades de acierto:\n"
-                    f"🔵 **{self.mi_personaje}:** {mi_pct}%\n"
-                    f"🔴 **{rival_personaje}:** {rival_pct}%\n\n"
-                    f"*Usa los botones de abajo para realizar tiradas durante el rol.*"
+                    f"🏆 **{ganador}** ganó la batalla.\n\n"
+                    f"El resultado ha sido registrado en el historial de ambos personajes."
                 ),
-                color=COLOR_INFO
-            )
-            clave = f"{self.user_id}_{self.rival.id}"
-            await canal.send(
-                embed=embed,
-                view=BatallaActivaView(self.bot, clave, self.canal_id)
-            )
-
-        await interaction.response.edit_message(
-            content="⚔️ ¡Batalla iniciada! Ve al canal para continuar.",
-            embed=None, view=None)
+                color=COLOR_APROBADO
+            ),
+            view=None
         self.stop()
 
 async def setup(bot):
