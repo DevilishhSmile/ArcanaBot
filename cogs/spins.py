@@ -42,48 +42,66 @@ def _guardar_ficha_poder(user_id: int, username: str, personaje: str,
                           nivel: str, mana: int, habilidades: str,
                           debilidades: str, estado: str = "PENDIENTE",
                           rechazos: int = 0, categoria: str = ""):
+    """
+    Columnas Sheets (orden exacto):
+    1:user_id | 2:username | 3:personaje | 4:categoria_raza | 5:nivel_poder
+    6:mana | 7:habilidades | 8:debilidades | 9:estado | 10:staff_que_reviso
+    11:fecha | 12:motivo_rechazo | 13:denegaciones
+    """
     from utils.sheets import get_sheet
     try:
         sheet = get_sheet("FichasPoder")
         rows  = sheet.get_all_values()
         for i, row in enumerate(rows):
             if i == 0: continue
-            if len(row) >= 2 and str(row[0]) == str(user_id) and \
-               row[1].strip().lower() == personaje.strip().lower():
-                # Actualizar fila existente
-                sheet.update_cell(i+1, 4, nivel)
-                sheet.update_cell(i+1, 5, str(mana))
-                sheet.update_cell(i+1, 7, habilidades)
-                sheet.update_cell(i+1, 8, debilidades)
-                sheet.update_cell(i+1, 9, estado)
-                sheet.update_cell(i+1, 12, _now())
+            if len(row) >= 3 and str(row[0]) == str(user_id) and \
+               row[2].strip().lower() == personaje.strip().lower():
+                # Al re-enviar ficha: solo actualizar habilidades/debilidades
+                # nivel y maná se mantienen del spin original
+                sheet.update_cell(i+1, 7,  habilidades)
+                sheet.update_cell(i+1, 8,  debilidades)
+                sheet.update_cell(i+1, 9,  estado)
+                sheet.update_cell(i+1, 11, _now())
                 return
         # Nueva fila
         sheet.append_row([
-            str(user_id), personaje, username,
-            nivel, str(mana), categoria,
-            habilidades, debilidades, estado,
-            str(rechazos), "", _now()
+            str(user_id), username, personaje,
+            categoria,      # col 4: categoria_raza (vacía, la asigna el staff)
+            nivel,          # col 5: nivel_poder
+            str(mana),      # col 6: mana
+            habilidades,    # col 7
+            debilidades,    # col 8
+            estado,         # col 9
+            "",             # col 10: staff_que_reviso
+            _now(),         # col 11: fecha
+            "",             # col 12: motivo_rechazo
+            str(rechazos),  # col 13: denegaciones
         ], value_input_option="USER_ENTERED")
     except Exception as e:
         print(f"[SPINS] _guardar_ficha_poder: {e}")
 
 def _actualizar_estado_ficha(user_id: int, personaje: str, estado: str,
                               staff: str = "", categoria: str = "",
-                              rechazos: int | None = None):
+                              rechazos: int | None = None,
+                              motivo: str = ""):
+    """
+    Actualiza estado, staff, categoría, motivo y denegaciones en FichasPoder.
+    Columnas: 4:categoria_raza | 9:estado | 10:staff | 11:fecha | 12:motivo | 13:denegaciones
+    """
     from utils.sheets import get_sheet
     try:
         sheet = get_sheet("FichasPoder")
         rows  = sheet.get_all_values()
         for i, row in enumerate(rows):
             if i == 0: continue
-            if len(row) >= 2 and str(row[0]) == str(user_id) and \
-               row[1].strip().lower() == personaje.strip().lower():
-                sheet.update_cell(i+1, 9, estado)
-                if staff:    sheet.update_cell(i+1, 11, staff)
-                if categoria: sheet.update_cell(i+1, 6, categoria)
-                if rechazos is not None: sheet.update_cell(i+1, 10, str(rechazos))
-                sheet.update_cell(i+1, 12, _now())
+            if len(row) >= 3 and str(row[0]) == str(user_id) and \
+               row[2].strip().lower() == personaje.strip().lower():
+                sheet.update_cell(i+1, 9,  estado)
+                sheet.update_cell(i+1, 11, _now())
+                if staff:                sheet.update_cell(i+1, 10, staff)
+                if categoria:            sheet.update_cell(i+1, 4,  categoria)
+                if motivo:               sheet.update_cell(i+1, 12, motivo)
+                if rechazos is not None: sheet.update_cell(i+1, 13, str(rechazos))
                 return
     except Exception as e:
         print(f"[SPINS] _actualizar_estado_ficha: {e}")
@@ -94,7 +112,7 @@ def _get_rechazos(user_id: int, personaje: str) -> int:
         for r in get_sheet("FichasPoder").get_all_records():
             if str(r.get("user_id","")) == str(user_id) and \
                r.get("personaje","").strip().lower() == personaje.strip().lower():
-                return int(r.get("rechazos", 0))
+                return int(r.get("denegaciones", 0) or 0)
     except Exception: pass
     return 0
 
@@ -464,9 +482,13 @@ class AprobarFichaPodeModal(discord.ui.Modal, title="✅ Aprobar Ficha de Poder"
         cat_data    = CATEGORIAS_RAZA[cat_raw]
         cat_display = f"{cat_data['emoji']} {cat_data['nombre']}"
         loop        = asyncio.get_event_loop()
-        await loop.run_in_executor(None, _actualizar_estado_ficha,
+        await loop.run_in_executor(None, lambda: _actualizar_estado_ficha(
             self.user_id, self.personaje, "APROBADO",
-            str(interaction.user), cat_raw, 0)
+            staff=str(interaction.user),
+            categoria=cat_raw,
+            rechazos=0,
+            motivo=""
+        ))
 
         # Actualizar mensaje del panel de staff
         embed = discord.Embed(
@@ -528,9 +550,13 @@ class RechazarFichaPodeModal(discord.ui.Modal, title="❌ Rechazar Ficha de Pode
             self.user_id, self.personaje)
         rechazos += 1
 
-        await loop.run_in_executor(None, _actualizar_estado_ficha,
+        await loop.run_in_executor(None, lambda: _actualizar_estado_ficha(
             self.user_id, self.personaje, "RECHAZADO",
-            str(interaction.user), "", rechazos)
+            staff=str(interaction.user),
+            categoria="",
+            rechazos=rechazos,
+            motivo=self.motivo.value
+        ))
 
         embed = discord.Embed(
             title="✨ Ficha de Poder — RECHAZADA ❌",
@@ -569,13 +595,14 @@ class RechazarFichaPodeModal(discord.ui.Modal, title="❌ Rechazar Ficha de Pode
                 canal = interaction.client.get_channel(CANAL_REVISION_FICHAS)
                 if canal:
                     await canal.send(
+                        content=f"<@&{ROL_STAFF}>",
                         embed=discord.Embed(
-                            title="🆘 Protocolo de Asistencia",
+                            title="🆘 Protocolo de Asistencia activado",
                             description=(
                                 f"<@{self.user_id}> ha acumulado **4 rechazos** en la ficha de poder "
                                 f"de **{self.personaje}**.\n\n"
-                                f"Por favor, un miembro del Staff contacte al usuario para "
-                                f"ayudarle a balancear su ficha de forma personalizada."
+                                f"Por favor, un miembro del Staff contacte al usuario directamente "
+                                f"para ayudarle a balancear su ficha de forma personalizada. 🙏"
                             ),
                             color=0xFF6B35
                         )
