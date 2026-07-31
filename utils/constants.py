@@ -241,3 +241,40 @@ def calcular_reduccion_suspension(pc_a_gastar: int, duracion_dias: int) -> dict:
         "pc_usados":      pc_usados,
         "pc_sobrante":    pc_a_gastar - pc_usados,
     }
+
+# =============================================
+# SISTEMA DE SPINS DE PODER
+# =============================================
+
+ROL_RESPIN = 1221473426573889699  # Rol de re-spin de tienda
+
+# Categorías de raza (asignadas por el staff al aprobar)
+CATEGORIAS_RAZA = {
+    "basica":     "⚪ Básica",
+    "intermedia": "🟡 Intermedia",
+    "divina":     "🔴 Divina",
+}
+
+# Niveles de poder
+NIVELES_PODER = {
+    "bajo":  {"nombre": "Bajo",  "emoji": "🟢", "desc": "Poderes en desarrollo, aún sin dominio completo."},
+    "medio": {"nombre": "Medio", "emoji": "🟡", "desc": "Poderes estables con buen control y versatilidad."},
+    "alto":  {"nombre": "Alto",  "emoji": "🔴", "desc": "Poderes dominados al máximo de su potencial."},
+}
+
+# Descripciones de maná (0-10)
+DESCRIPCIONES_MANA = {
+    0:  "Sin rastro de maná — un mortal común.",
+    1:  "Chispa mínima, apenas perceptible.",
+    2:  "Flujo débil, difícil de canalizar.",
+    3:  "Reserva baja pero funcional.",
+    4:  "Moderado, suficiente para hechizos simples.",
+    5:  "Equilibrado, base sólida de maná.",
+    6:  "Notable, capaz de sostener magia compleja.",
+    7:  "Abundante, con presencia mágica clara.",
+    8:  "Poderoso, difícil de ignorar.",
+    9:  "Excepcional, rara vez visto.",
+    10: "Ilimitado — una anomalía del archipiélago.",
+}
+
+CANAL_REVISION_PODER = None  # Usa CANAL_REVISION_FICHAS
