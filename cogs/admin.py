@@ -30,34 +30,25 @@ class Admin(commands.Cog):
     def _es_staff(self, i):
         return any(r.id == ROL_STAFF for r in i.user.roles)
 
-    # ──────────────────────────────────────────────
-    # /reclamar-slot
-    # ──────────────────────────────────────────────
-
     @app_commands.command(name="reclamar-slot",
         description="Reclama tu slot adicional de personaje si tienes el rol +Slot de Personaje.")
     @app_commands.guilds(discord.Object(id=GUILD_ID))
     async def reclamar_slot(self, interaction: discord.Interaction):
         from utils.database import agregar_slot_extra, get_conteo_usuario
-
         if not any(r.id == ROL_SLOT_ADICIONAL for r in interaction.user.roles):
             await interaction.response.send_message(
                 "❌ No tienes el rol **+Slot de Personaje**.\n\nAdquiérelo en la tienda y vuelve a usar este comando.",
                 ephemeral=True)
             return
-
         gen = cargar_generacion()
         await agregar_slot_extra(interaction.user.id, gen, cantidad=1)
-
         try:
             rol = interaction.guild.get_role(ROL_SLOT_ADICIONAL)
             if rol: await interaction.user.remove_roles(rol, reason="Slot adicional reclamado")
         except Exception as e:
             print(f"[ADMIN] Error quitando rol slot: {e}")
-
         conteo = await get_conteo_usuario(interaction.user.id, gen)
         disp   = conteo.get("slots_extra_disponibles", 0)
-
         embed = discord.Embed(title="✨ Slot adicional reclamado",
             description=(
                 f"¡Tu slot adicional fue añadido!\n\n"
@@ -66,10 +57,6 @@ class Admin(commands.Cog):
             ), color=COLOR_APROBADO)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    # ──────────────────────────────────────────────
-    # /mis-personajes
-    # ──────────────────────────────────────────────
-
     @app_commands.command(name="mis-personajes",
         description="Ver cuántos personajes tienes registrados y tus slots disponibles.")
     @app_commands.guilds(discord.Object(id=GUILD_ID))
@@ -77,19 +64,16 @@ class Admin(commands.Cog):
         from utils.database import get_conteo_usuario
         from utils.constants import SLOTS_CONFIG
         from utils.sheets import get_personajes_usuario
-
         gen    = cargar_generacion()
         conteo = await get_conteo_usuario(interaction.user.id, gen)
         config = SLOTS_CONFIG.get(gen, SLOTS_CONFIG["default"])
         personajes = get_personajes_usuario(interaction.user.id)
-
         def barra(usado, limite):
             if limite is None: return f"**{usado}** / ∞"
             llenos = "🟩" * min(usado, limite)
             vacios = "⬜" * max(0, limite - usado)
             extras = "🟨" * max(0, usado - limite)
             return f"{llenos}{vacios}{extras} **{usado}/{limite}**"
-
         embed = discord.Embed(
             title=f"📋 Mis personajes — Gen {gen} (Server Gen {gen+3})",
             color=COLOR_INFO)
@@ -100,20 +84,14 @@ class Admin(commands.Cog):
             f"🧑‍🏫 Profesores:   {barra(conteo.get('profesores_usados',0),   config.get('profesores',2))}\n"
             f"🧑‍💼 Trabajadores: {barra(conteo.get('trabajadores_usados',0), config.get('trabajadores',2))}"
         ), inline=False)
-
         disp   = conteo.get("slots_extra_disponibles", 0)
         usados = conteo.get("slots_extra_usados", 0)
         embed.add_field(name="✨ Slots adicionales",
             value=f"Disponibles: **{disp}** | Usados: **{usados}** | Total: **{disp+usados}**",
             inline=False)
         embed.set_footer(text="Solo tú puedes ver este mensaje.")
-
         view = MisPersonajesView(personajes=personajes, embed_slots=embed)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-
-    # ──────────────────────────────────────────────
-    # /ver-personajes @usuario
-    # ──────────────────────────────────────────────
 
     @app_commands.command(name="ver-personajes",
         description="[STAFF] Ver los personajes de un usuario.")
@@ -123,19 +101,15 @@ class Admin(commands.Cog):
         if not self._es_staff(interaction):
             await interaction.response.send_message("❌ Solo el staff puede.", ephemeral=True)
             return
-
         from utils.database import get_conteo_usuario
         from utils.constants import SLOTS_CONFIG
         from utils.sheets import get_personajes_usuario
-
         gen    = cargar_generacion()
         conteo = await get_conteo_usuario(usuario.id, gen)
         config = SLOTS_CONFIG.get(gen, SLOTS_CONFIG["default"])
         personajes = get_personajes_usuario(usuario.id)
-
         def fmt(usado, limite):
             return f"**{usado}** / {'∞' if limite is None else limite}"
-
         embed = discord.Embed(title=f"📋 {usuario.display_name} — Gen {gen}", color=COLOR_INFO)
         embed.set_author(name=usuario.display_name, icon_url=usuario.display_avatar.url)
         embed.add_field(name="Slots usados", value=(
@@ -146,13 +120,8 @@ class Admin(commands.Cog):
         embed.add_field(name="✨ Slots adicionales",
             value=f"Disponibles: **{conteo.get('slots_extra_disponibles',0)}** | Usados: **{conteo.get('slots_extra_usados',0)}**",
             inline=False)
-
         view = MisPersonajesView(personajes=personajes, embed_slots=embed)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-
-    # ──────────────────────────────────────────────
-    # /eliminar-personaje
-    # ──────────────────────────────────────────────
 
     @app_commands.command(name="eliminar-personaje",
         description="Solicita eliminar uno de tus personajes (requiere aprobación del staff).")
@@ -160,19 +129,14 @@ class Admin(commands.Cog):
     @app_commands.guilds(discord.Object(id=GUILD_ID))
     async def eliminar_personaje(self, interaction: discord.Interaction, nombre: str):
         from utils.sheets import get_personajes_usuario
-        from utils.constants import CANAL_REVISION_FICHAS
-
         personajes = get_personajes_usuario(interaction.user.id)
         encontrado = next(
             (p for p in personajes if p["personaje"].strip().lower() == nombre.strip().lower()), None)
-
         if not encontrado:
             await interaction.response.send_message(
                 f"❌ No encontré ningún personaje llamado **{nombre}** en tus registros.\n\nUsa `/mis-personajes` para ver los tuyos.",
                 ephemeral=True)
             return
-
-        # Abrir modal para pedir motivo
         await interaction.response.send_modal(
             MotivoEliminacionModal(
                 personaje=encontrado["personaje"],
@@ -182,9 +146,7 @@ class Admin(commands.Cog):
             )
         )
 
-    # ──────────────────────────────────────────────
-    # /admin-stats
-    # ──────────────────────────────────────────────
+    # ── /admin-stats — PANEL CON 5 SECCIONES ─────
 
     @app_commands.command(name="admin-stats",
         description="[STAFF] Ver estadísticas globales del servidor RP.")
@@ -193,56 +155,15 @@ class Admin(commands.Cog):
         if not self._es_staff(interaction):
             await interaction.response.send_message("❌ Solo el staff puede.", ephemeral=True)
             return
-
         await interaction.response.defer(ephemeral=True)
-        from utils.sheets import get_global_stats, actualizar_global_stats
-        from utils.constants import CARGOS, MATERIAS_LIMITE
-        from utils.sheets import get_profesores_aprobados_por_materia, get_trabajadores_aprobados_por_cargo
-
-        actualizar_global_stats()
-        stats = get_global_stats()
-        gen   = cargar_generacion()
-
-        embed = discord.Embed(title=f"📊 Admin Stats — Gen {gen} (Server Gen {gen+3})", color=COLOR_INFO)
-        embed.add_field(name="✅ Aprobados", value=(
-            f"🎓 Estudiantes: **{stats.get('estudiantes_total',0)}**\n"
-            f"🧑‍🏫 Profesores: **{stats.get('profesores_total',0)}**\n"
-            f"🧑‍💼 Trabajadores: **{stats.get('trabajadores_total',0)}**\n"
-            f"👕 Uniformes: **{stats.get('uniformes_aprobados',0)}**"
-        ), inline=True)
-        embed.add_field(name="⏳ Pendientes", value=(
-            f"👕 Uniformes: **{stats.get('uniformes_pendientes',0)}**\n"
-            f"🎓 Fichas: **{stats.get('fichas_pendientes',0)}**\n"
-            f"🧑‍💼 Trabajos: **{stats.get('trabajos_pendientes',0)}**\n"
-            f"📋 Total: **{stats.get('pendientes_totales',0)}**"
-        ), inline=True)
-        embed.add_field(name="\u200b", value="\u200b", inline=False)
-
-        cargo_lines = []
-        for cargo, limite in CARGOS.items():
-            cupo = limite or 1
-            ocup = get_trabajadores_aprobados_por_cargo(cargo)
-            estado = "✅" if ocup < cupo else "🔴"
-            cargo_lines.append(f"{estado} {cargo}: **{ocup}/{cupo}**")
-        embed.add_field(name="🧑‍💼 Cupos trabajadores", value="\n".join(cargo_lines), inline=False)
-
-        mat_lines = []
-        for materia, limite in MATERIAS_LIMITE.items():
-            ocup = get_profesores_aprobados_por_materia(materia)
-            if ocup > 0 or limite <= 1:
-                estado = "✅" if ocup < limite else "🔴"
-                mat_lines.append(f"{estado} {materia}: **{ocup}/{limite}**")
-        if mat_lines:
-            mid = len(mat_lines) // 2
-            embed.add_field(name="🧑‍🏫 Cupos materias (1/2)", value="\n".join(mat_lines[:mid]) or "—", inline=False)
-            embed.add_field(name="🧑‍🏫 Cupos materias (2/2)", value="\n".join(mat_lines[mid:]) or "—", inline=False)
-
-        embed.set_footer(text="Stats actualizados al momento de ejecutar el comando.")
-        await interaction.followup.send(embed=embed, ephemeral=True)
-
-    # ──────────────────────────────────────────────
-    # /panel-uniformes
-    # ──────────────────────────────────────────────
+        import asyncio
+        from utils.sheets import actualizar_global_stats
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, actualizar_global_stats)
+        gen  = cargar_generacion()
+        view = AdminStatsView(gen=gen)
+        embed = await view.build_embed_general()
+        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
     @app_commands.command(name="panel-uniformes",
         description="[STAFF] Ver y gestionar uniformes pendientes de revisión.")
@@ -251,23 +172,15 @@ class Admin(commands.Cog):
         if not self._es_staff(interaction):
             await interaction.response.send_message("❌ Solo el staff puede.", ephemeral=True)
             return
-
         await interaction.response.defer(ephemeral=True)
         from utils.sheets import get_uniformes_pendientes
-
         pendientes = get_uniformes_pendientes()
         if not pendientes:
             await interaction.followup.send("✅ No hay uniformes pendientes.", ephemeral=True)
             return
-
-        # Mostrar el primer uniforme con botones de navegación
         view = PanelUniformesView(pendientes=pendientes, indice=0)
         embed = view.build_embed()
         await interaction.followup.send(embed=embed, view=view, ephemeral=True)
-
-    # ──────────────────────────────────────────────
-    # /generacion
-    # ──────────────────────────────────────────────
 
     gen_group = app_commands.Group(
         name="generacion", description="Gestión de generaciones.", guild_ids=[GUILD_ID])
@@ -327,327 +240,507 @@ class Admin(commands.Cog):
 
 
 # ──────────────────────────────────────────────
-# MODAL — Motivo de eliminación de personaje
+# ADMIN STATS VIEW — 5 secciones navegables
+# ──────────────────────────────────────────────
+
+class AdminStatsView(discord.ui.View):
+    SECCIONES = ["general", "moderacion", "pca", "spins", "batallas"]
+    LABELS    = {
+        "general":    "📋 General",
+        "moderacion": "⚠️ Moderación",
+        "pca":        "💎 PCA",
+        "spins":      "✨ Spins",
+        "batallas":   "⚔️ Batallas",
+    }
+
+    def __init__(self, gen: int):
+        super().__init__(timeout=300)
+        self.gen     = gen
+        self.seccion = "general"
+        self._update_buttons()
+
+    def _update_buttons(self):
+        self.clear_items()
+        for i, key in enumerate(self.SECCIONES):
+            btn = discord.ui.Button(
+                label=self.LABELS[key],
+                style=discord.ButtonStyle.primary if key == self.seccion
+                      else discord.ButtonStyle.secondary,
+                custom_id=f"stats_{key}",
+                row=0 if i < 3 else 1,
+            )
+            btn.callback = self._make_callback(key)
+            self.add_item(btn)
+
+    def _make_callback(self, key: str):
+        async def callback(interaction: discord.Interaction):
+            self.seccion = key
+            self._update_buttons()
+            build = getattr(self, f"build_embed_{key}")
+            embed = await build()
+            await interaction.response.edit_message(embed=embed, view=self)
+        return callback
+
+    async def build_embed_general(self) -> discord.Embed:
+        import asyncio
+        from utils.sheets import (
+            get_global_stats,
+            get_profesores_aprobados_por_materia,
+            get_trabajadores_aprobados_por_cargo,
+        )
+        from utils.constants import CARGOS, MATERIAS_LIMITE
+        loop  = asyncio.get_event_loop()
+        stats = await loop.run_in_executor(None, get_global_stats)
+        embed = discord.Embed(
+            title=f"📋 Stats Generales — Gen {self.gen} (Server Gen {self.gen+3})",
+            color=0xA569BD)
+        embed.add_field(name="✅ Aprobados", value=(
+            f"🎓 Estudiantes: **{stats.get('estudiantes_total',0)}**\n"
+            f"🧑‍🏫 Profesores: **{stats.get('profesores_total',0)}**\n"
+            f"🧑‍💼 Trabajadores: **{stats.get('trabajadores_total',0)}**\n"
+            f"👕 Uniformes: **{stats.get('uniformes_aprobados',0)}**"
+        ), inline=True)
+        embed.add_field(name="⏳ Pendientes", value=(
+            f"👕 Uniformes: **{stats.get('uniformes_pendientes',0)}**\n"
+            f"🎓 Fichas: **{stats.get('fichas_pendientes',0)}**\n"
+            f"🧑‍💼 Trabajos: **{stats.get('trabajos_pendientes',0)}**\n"
+            f"📋 Total: **{stats.get('pendientes_totales',0)}**"
+        ), inline=True)
+        embed.add_field(name="\u200b", value="\u200b", inline=False)
+        cargo_lines = []
+        for cargo, limite in CARGOS.items():
+            cupo = limite or 1
+            ocup = await loop.run_in_executor(None, get_trabajadores_aprobados_por_cargo, cargo)
+            estado = "✅" if ocup < cupo else "🔴"
+            cargo_lines.append(f"{estado} {cargo}: **{ocup}/{cupo}**")
+        embed.add_field(name="🧑‍💼 Cupos trabajadores", value="\n".join(cargo_lines) or "—", inline=False)
+        mat_lines = []
+        for materia, limite in MATERIAS_LIMITE.items():
+            ocup = await loop.run_in_executor(None, get_profesores_aprobados_por_materia, materia)
+            if ocup > 0 or limite <= 1:
+                estado = "✅" if ocup < limite else "🔴"
+                mat_lines.append(f"{estado} {materia}: **{ocup}/{limite}**")
+        if mat_lines:
+            mid = len(mat_lines) // 2
+            embed.add_field(name="🧑‍🏫 Cupos materias (1/2)", value="\n".join(mat_lines[:mid]) or "—", inline=False)
+            embed.add_field(name="🧑‍🏫 Cupos materias (2/2)", value="\n".join(mat_lines[mid:]) or "—", inline=False)
+        embed.set_footer(text="Stats actualizados al abrir el panel.")
+        return embed
+
+    async def build_embed_moderacion(self) -> discord.Embed:
+        import asyncio
+        from utils.sheets import get_sheet
+        loop = asyncio.get_event_loop()
+        def _leer():
+            try: return get_sheet("Sanciones").get_all_records()
+            except Exception: return []
+        rows      = await loop.run_in_executor(None, _leer)
+        activas   = [r for r in rows if r.get("estado","").upper() == "ACTIVA"]
+        cumplidas = [r for r in rows if r.get("estado","").upper() == "CUMPLIDA"]
+        limpiadas = [r for r in rows if r.get("estado","").upper() == "LIMPIADA"]
+        tipos_count = {}
+        for r in activas:
+            t = r.get("tipo","?")
+            tipos_count[t] = tipos_count.get(t, 0) + 1
+        nombres_tipo = {
+            "castigo_menor": "⚠️ Castigos Menores",
+            "detencion":     "🔒 Detenciones",
+            "suspension":    "🚫 Suspensiones",
+            "expulsion":     "💀 Expulsiones",
+        }
+        personaje_count = {}
+        for r in activas:
+            p = r.get("personaje","?")
+            personaje_count[p] = personaje_count.get(p, 0) + 1
+        top_sancionados = sorted(personaje_count.items(), key=lambda x: x[1], reverse=True)[:5]
+        staff_count = {}
+        for r in rows:
+            s = r.get("asignado_por","?")
+            staff_count[s] = staff_count.get(s, 0) + 1
+        top_staff = sorted(staff_count.items(), key=lambda x: x[1], reverse=True)[:3]
+        embed = discord.Embed(title="⚠️ Stats de Moderación", color=0xE74C3C)
+        embed.add_field(name="📊 Resumen global", value=(
+            f"🔴 Activas: **{len(activas)}**\n"
+            f"✅ Cumplidas: **{len(cumplidas)}**\n"
+            f"🧹 Limpiadas: **{len(limpiadas)}**\n"
+            f"📋 Total histórico: **{len(rows)}**"
+        ), inline=True)
+        if tipos_count:
+            embed.add_field(name="⚠️ Activas por tipo", value="\n".join(
+                f"{nombres_tipo.get(t,t)}: **{n}**"
+                for t, n in sorted(tipos_count.items(), key=lambda x: x[1], reverse=True)
+            ), inline=True)
+        else:
+            embed.add_field(name="⚠️ Sanciones activas", value="Ninguna ✅", inline=True)
+        embed.add_field(name="\u200b", value="\u200b", inline=False)
+        if top_sancionados:
+            embed.add_field(name="🔝 Top personajes sancionados", value="\n".join(
+                f"**{i+1}.** {p} — {n} sanción(es)"
+                for i, (p, n) in enumerate(top_sancionados)
+            ), inline=True)
+        if top_staff:
+            embed.add_field(name="👮 Staff más activo (histórico)", value="\n".join(
+                f"**{i+1}.** {s} — {n} sanción(es)"
+                for i, (s, n) in enumerate(top_staff)
+            ), inline=True)
+        embed.set_footer(text="Datos en tiempo real desde Google Sheets.")
+        return embed
+
+    async def build_embed_pca(self) -> discord.Embed:
+        import asyncio
+        from utils.sheets import get_sheet
+        loop = asyncio.get_event_loop()
+        def _leer_pc():
+            try: return get_sheet("PuntosPC").get_all_records()
+            except Exception: return []
+        def _leer_hist():
+            try: return get_sheet("HistorialPC").get_all_records()
+            except Exception: return []
+        pc_rows, hist_rows = await asyncio.gather(
+            loop.run_in_executor(None, _leer_pc),
+            loop.run_in_executor(None, _leer_hist),
+        )
+        total_otorgados  = sum(int(r.get("pc_total",0) or 0) for r in pc_rows)
+        total_disponibles = sum(int(r.get("pc_disponible",0) or 0) for r in pc_rows)
+        total_gastados   = total_otorgados - total_disponibles
+        top_pc = sorted(
+            [(r.get("personaje","?"), int(r.get("pc_total",0) or 0)) for r in pc_rows],
+            key=lambda x: x[1], reverse=True)[:5]
+        asignadores = {}
+        canjes = 0
+        for r in hist_rows:
+            cant = str(r.get("pc_otorgados","0")).replace("+","")
+            try: n = float(cant)
+            except ValueError: n = 0
+            if n > 0:
+                s = r.get("asignado_por","?")
+                asignadores[s] = asignadores.get(s, 0) + int(n)
+            elif n < 0:
+                canjes += 1
+        top_asignadores = sorted(asignadores.items(), key=lambda x: x[1], reverse=True)[:3]
+        embed = discord.Embed(title="💎 Stats de Puntos PCA", color=0x9B59B6)
+        embed.add_field(name="📊 Resumen global", value=(
+            f"💎 PC otorgados (histórico): **{total_otorgados}**\n"
+            f"✅ PC disponibles: **{total_disponibles}**\n"
+            f"🔄 PC gastados en canjes: **{total_gastados}**\n"
+            f"🔄 Total canjes realizados: **{canjes}**\n"
+            f"👤 Personajes con PC: **{len(pc_rows)}**"
+        ), inline=False)
+        if top_pc:
+            embed.add_field(name="🏆 Top 5 con más PC", value="\n".join(
+                f"**{i+1}.** {p} — **{n} PC**"
+                for i, (p, n) in enumerate(top_pc)
+            ), inline=True)
+        if top_asignadores:
+            embed.add_field(name="✍️ Top asignadores de PC", value="\n".join(
+                f"**{i+1}.** {s} — **{n} PC** asignados"
+                for i, (s, n) in enumerate(top_asignadores)
+            ), inline=True)
+        embed.set_footer(text="Datos en tiempo real desde Google Sheets.")
+        return embed
+
+    async def build_embed_spins(self) -> discord.Embed:
+        import asyncio
+        from utils.sheets import get_sheet
+        from utils.constants import CATEGORIAS_RAZA, NIVELES_PODER
+        loop = asyncio.get_event_loop()
+        def _leer_fichas():
+            try: return get_sheet("FichasPoder").get_all_records()
+            except Exception: return []
+        def _leer_spins():
+            try: return get_sheet("HistorialSpins").get_all_records()
+            except Exception: return []
+        fichas, spins = await asyncio.gather(
+            loop.run_in_executor(None, _leer_fichas),
+            loop.run_in_executor(None, _leer_spins),
+        )
+        aprobadas  = [f for f in fichas if f.get("estado","").upper() == "APROBADO"]
+        pendientes = [f for f in fichas if f.get("estado","").upper() == "PENDIENTE"]
+        rechazadas = [f for f in fichas if f.get("estado","").upper() == "RECHAZADO"]
+        cat_count = {}
+        for f in aprobadas:
+            c = f.get("categoria_raza","sin asignar") or "sin asignar"
+            cat_count[c] = cat_count.get(c, 0) + 1
+        nivel_count = {}
+        for f in fichas:
+            n = f.get("nivel_poder","?") or "?"
+            nivel_count[n] = nivel_count.get(n, 0) + 1
+        embed = discord.Embed(title="✨ Stats de Spins de Poder", color=0x5B2C9B)
+        embed.add_field(name="📊 Fichas de Poder", value=(
+            f"✅ Aprobadas: **{len(aprobadas)}**\n"
+            f"⏳ Pendientes: **{len(pendientes)}**\n"
+            f"❌ Rechazadas: **{len(rechazadas)}**\n"
+            f"📋 Total spins: **{len(spins)}**"
+        ), inline=True)
+        if nivel_count:
+            nivel_txt = "\n".join(
+                f"{NIVELES_PODER.get(n,{}).get('emoji','?')} {NIVELES_PODER.get(n,{}).get('nombre',n)}: **{c}**"
+                for n, c in sorted(nivel_count.items(), key=lambda x: x[1], reverse=True)
+                if n != "?"
+            )
+            embed.add_field(name="📶 Por nivel de poder", value=nivel_txt or "—", inline=True)
+        embed.add_field(name="\u200b", value="\u200b", inline=False)
+        if cat_count:
+            cat_txt = "\n".join(
+                f"{CATEGORIAS_RAZA.get(c,{}).get('emoji','?')} {CATEGORIAS_RAZA.get(c,{}).get('nombre',c)}: **{n}**"
+                for c, n in sorted(cat_count.items(), key=lambda x: x[1], reverse=True)
+            )
+            embed.add_field(name="🏷️ Por categoría de raza (aprobadas — solo staff)", value=cat_txt or "—", inline=False)
+        embed.set_footer(text="Categorías de raza son secretas para los usuarios.")
+        return embed
+
+    async def build_embed_batallas(self) -> discord.Embed:
+        import asyncio
+        from utils.sheets import get_sheet
+        loop = asyncio.get_event_loop()
+        def _leer():
+            try: return get_sheet("HistorialBatallas").get_all_records()
+            except Exception: return []
+        rows = await loop.run_in_executor(None, _leer)
+        total     = len(rows)
+        victorias = [r for r in rows if r.get("resultado","").upper() == "VICTORIA"]
+        embed = discord.Embed(title="⚔️ Stats de Batallas", color=0xE67E22)
+        if total == 0:
+            embed.description = "No hay batallas registradas todavía."
+            return embed
+        wins_count = {}
+        for r in victorias:
+            p = r.get("personaje","?")
+            wins_count[p] = wins_count.get(p, 0) + 1
+        top_ganadores = sorted(wins_count.items(), key=lambda x: x[1], reverse=True)[:5]
+        total_count = {}
+        for r in rows:
+            p = r.get("personaje","?")
+            total_count[p] = total_count.get(p, 0) + 1
+        top_activos = sorted(total_count.items(), key=lambda x: x[1], reverse=True)[:5]
+        embed.add_field(name="📊 Resumen global", value=(
+            f"⚔️ Batallas totales: **{total // 2}**\n"
+            f"✅ Victorias registradas: **{len(victorias)}**\n"
+            f"❌ Derrotas registradas: **{total - len(victorias)}**"
+        ), inline=False)
+        if top_ganadores:
+            embed.add_field(name="🏆 Top 5 más victorias", value="\n".join(
+                f"**{i+1}.** {p} — **{n}** victoria(s)"
+                for i, (p, n) in enumerate(top_ganadores)
+            ), inline=True)
+        if top_activos:
+            embed.add_field(name="⚔️ Top 5 más activos", value="\n".join(
+                f"**{i+1}.** {p} — **{max(n//2,1)}** batalla(s)"
+                for i, (p, n) in enumerate(top_activos)
+            ), inline=True)
+        embed.set_footer(text="Datos en tiempo real desde Google Sheets.")
+        return embed
+
+
+
+# ──────────────────────────────────────────────
+# VIEWS EXISTENTES (sin cambios)
 # ──────────────────────────────────────────────
 
 class MotivoEliminacionModal(discord.ui.Modal, title="🗑️ Solicitud de eliminación"):
     motivo = discord.ui.TextInput(
-        label="Motivo (opcional)",
-        style=discord.TextStyle.paragraph,
+        label="Motivo (opcional)", style=discord.TextStyle.paragraph,
         placeholder="¿Por qué quieres eliminar este personaje?",
-        required=False,
-        max_length=500,
-    )
-
-    def __init__(self, personaje: str, tipo: str, detalle: str, user_id: int):
+        required=False, max_length=500)
+    def __init__(self, personaje, tipo, detalle, user_id):
         super().__init__()
-        self.personaje = personaje
-        self.tipo      = tipo
-        self.detalle   = detalle
-        self.user_id   = user_id
-
+        self.personaje = personaje; self.tipo = tipo
+        self.detalle = detalle; self.user_id = user_id
     async def on_submit(self, interaction: discord.Interaction):
         from utils.constants import CANAL_REVISION_FICHAS
-
         motivo_texto = self.motivo.value.strip() if self.motivo.value else "Sin motivo especificado."
-
         await interaction.response.send_message(
             f"📨 Tu solicitud de eliminación para **{self.personaje}** fue enviada al staff.\n"
-            f"Recibirás una notificación cuando sea procesada.",
-            ephemeral=True)
-
+            f"Recibirás una notificación cuando sea procesada.", ephemeral=True)
         canal_staff = interaction.client.get_channel(CANAL_REVISION_FICHAS)
         if not canal_staff: return
-
         embed = discord.Embed(title="🗑️ Solicitud de eliminación de personaje",
             description=(
-                f"**Usuario:** <@{self.user_id}>\n"
-                f"**Personaje:** {self.personaje}\n"
-                f"**Tipo:** {self.tipo.capitalize()}\n"
-                f"**Detalle:** {self.detalle}\n\n"
-                f"**Motivo del usuario:**\n{motivo_texto}"
-            ), color=COLOR_PENDIENTE)
+                f"**Usuario:** <@{self.user_id}>\n**Personaje:** {self.personaje}\n"
+                f"**Tipo:** {self.tipo.capitalize()}\n**Detalle:** {self.detalle}\n\n"
+                f"**Motivo del usuario:**\n{motivo_texto}"),
+            color=COLOR_PENDIENTE)
         embed.set_footer(text=f"Solicitado por {interaction.user.display_name}")
         await canal_staff.send(embed=embed,
             view=EliminarPersonajeView(user_id=self.user_id, personaje=self.personaje, tipo=self.tipo))
 
 
-# ──────────────────────────────────────────────
-# VIEW — Panel de uniformes pendientes con navegación
-# ──────────────────────────────────────────────
-
 class PanelUniformesView(discord.ui.View):
-    def __init__(self, pendientes: list, indice: int):
+    def __init__(self, pendientes, indice):
         super().__init__(timeout=300)
-        self.pendientes = pendientes
-        self.indice     = indice
+        self.pendientes = pendientes; self.indice = indice
         self._update_buttons()
-
     def _update_buttons(self):
-        # Activar/desactivar botones según posición
-        self.anterior.disabled = self.indice == 0
+        self.anterior.disabled  = self.indice == 0
         self.siguiente.disabled = self.indice >= len(self.pendientes) - 1
-
-    def build_embed(self) -> discord.Embed:
-        u   = self.pendientes[self.indice]
-        total = len(self.pendientes)
-        embed = discord.Embed(
-            title=f"👕 Uniforme pendiente ({self.indice+1}/{total})",
-            color=COLOR_PENDIENTE)
+    def build_embed(self):
+        u = self.pendientes[self.indice]; total = len(self.pendientes)
+        embed = discord.Embed(title=f"👕 Uniforme pendiente ({self.indice+1}/{total})", color=COLOR_PENDIENTE)
         embed.add_field(name="Personaje", value=u.get("personaje","?"), inline=True)
-        embed.add_field(name="Usuario",   value=f"<@{u.get('user_id','?')}> (`{u.get('username','?')}`)", inline=True)
-        embed.add_field(name="Fecha",     value=u.get("fecha","?"), inline=False)
-        if u.get("link_imagen"):
-            embed.set_image(url=u["link_imagen"])
+        embed.add_field(name="Usuario", value=f"<@{u.get('user_id','?')}> (`{u.get('username','?')}`)", inline=True)
+        embed.add_field(name="Fecha", value=u.get("fecha","?"), inline=False)
+        if u.get("link_imagen"): embed.set_image(url=u["link_imagen"])
         return embed
-
     @discord.ui.button(label="◀ Anterior", style=discord.ButtonStyle.secondary)
-    async def anterior(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.indice = max(0, self.indice - 1)
-        self._update_buttons()
+    async def anterior(self, interaction, button):
+        self.indice = max(0, self.indice - 1); self._update_buttons()
         await interaction.response.edit_message(embed=self.build_embed(), view=self)
-
     @discord.ui.button(label="Siguiente ▶", style=discord.ButtonStyle.secondary)
-    async def siguiente(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.indice = min(len(self.pendientes) - 1, self.indice + 1)
-        self._update_buttons()
+    async def siguiente(self, interaction, button):
+        self.indice = min(len(self.pendientes)-1, self.indice+1); self._update_buttons()
         await interaction.response.edit_message(embed=self.build_embed(), view=self)
-
     @discord.ui.button(label="✅ Aprobar este", style=discord.ButtonStyle.success, row=1)
-    async def aprobar(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def aprobar(self, interaction, button):
         from utils.sheets import aprobar_uniforme
         from utils.constants import CANAL_ENVIAR_UNIFORME
-
         u = self.pendientes[self.indice]
-        try:
-            aprobar_uniforme(u.get("user_id"), u.get("personaje",""), u.get("link_imagen",""), str(interaction.user))
-        except Exception as e:
-            print(f"[PANEL_UNIFORMES] Error Sheets: {e}")
-
-        # Notificar al usuario
+        try: aprobar_uniforme(u.get("user_id"), u.get("personaje",""), u.get("link_imagen",""), str(interaction.user))
+        except Exception as e: print(f"[PANEL_UNIFORMES] {e}")
         canal = interaction.client.get_channel(CANAL_ENVIAR_UNIFORME)
         embed_user = discord.Embed(title="✅ Uniforme aprobado",
             description=f"¡Felicidades <@{u.get('user_id')}>! Tu uniforme para **{u.get('personaje','')}** fue aprobado. 🎉\n\nYa puedes registrar tu ficha.",
             color=COLOR_APROBADO)
         if u.get("link_imagen"): embed_user.set_image(url=u["link_imagen"])
         if canal: await canal.send(embed=embed_user)
-
-        # Quitar de la lista y avanzar
         self.pendientes.pop(self.indice)
         if not self.pendientes:
-            await interaction.response.edit_message(
-                content="✅ Todos los uniformes han sido procesados.", embed=None, view=None)
-            return
-        self.indice = min(self.indice, len(self.pendientes) - 1)
-        self._update_buttons()
+            await interaction.response.edit_message(content="✅ Todos los uniformes procesados.", embed=None, view=None); return
+        self.indice = min(self.indice, len(self.pendientes)-1); self._update_buttons()
         await interaction.response.edit_message(embed=self.build_embed(), view=self)
-
     @discord.ui.button(label="❌ Rechazar este", style=discord.ButtonStyle.danger, row=1)
-    async def rechazar(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def rechazar(self, interaction, button):
         u = self.pendientes[self.indice]
         await interaction.response.send_modal(
             RechazoUniformePanelModal(uniforme=u, pendientes=self.pendientes,
                                       indice=self.indice, panel_view=self))
-
     @discord.ui.button(label="⏭ Terminar revisión", style=discord.ButtonStyle.secondary, row=1)
-    async def terminar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        restantes = len(self.pendientes)
+    async def terminar(self, interaction, button):
         await interaction.response.edit_message(
-            content=f"✅ Revisión terminada. Quedan **{restantes}** uniforme{'s' if restantes != 1 else ''} pendiente{'s' if restantes != 1 else ''} en la cola.",
+            content=f"✅ Revisión terminada. Quedan **{len(self.pendientes)}** pendiente(s).",
             embed=None, view=None)
 
 
 class RechazoUniformePanelModal(discord.ui.Modal, title="✏️ Motivo de rechazo"):
-    motivo = discord.ui.TextInput(
-        label="¿Por qué se rechaza?",
-        style=discord.TextStyle.paragraph,
-        placeholder="Explica el motivo al usuario...",
-        required=False, max_length=500)
-
-    def __init__(self, uniforme: dict, pendientes: list, indice: int, panel_view):
+    motivo = discord.ui.TextInput(label="¿Por qué se rechaza?", style=discord.TextStyle.paragraph,
+        placeholder="Explica el motivo al usuario...", required=False, max_length=500)
+    def __init__(self, uniforme, pendientes, indice, panel_view):
         super().__init__()
-        self.uniforme   = uniforme
-        self.pendientes = pendientes
-        self.indice     = indice
-        self.panel_view = panel_view
-
+        self.uniforme = uniforme; self.pendientes = pendientes
+        self.indice = indice; self.panel_view = panel_view
     async def on_submit(self, interaction: discord.Interaction):
         from utils.sheets import rechazar_uniforme
         from utils.constants import CANAL_ENVIAR_UNIFORME
-
         m = self.motivo.value.strip() if self.motivo.value else "Sin motivo especificado."
         u = self.uniforme
-
-        try:
-            rechazar_uniforme(u.get("user_id"), u.get("personaje",""), str(interaction.user), m)
-        except Exception as e:
-            print(f"[PANEL_UNIFORMES] Error rechazar: {e}")
-
+        try: rechazar_uniforme(u.get("user_id"), u.get("personaje",""), str(interaction.user), m)
+        except Exception as e: print(f"[PANEL_UNIFORMES] {e}")
         canal = interaction.client.get_channel(CANAL_ENVIAR_UNIFORME)
         embed_user = discord.Embed(title="❌ Uniforme rechazado",
             description=f"Hola <@{u.get('user_id')}>, tu uniforme para **{u.get('personaje','')}** fue rechazado.\n\n**Motivo:**\n{m}\n\nCorrígelo con `/uniforme`. 💪",
             color=COLOR_RECHAZADO)
         if u.get("link_imagen"): embed_user.set_image(url=u["link_imagen"])
         if canal: await canal.send(embed=embed_user)
-
-        # Quitar de la lista
         self.pendientes.pop(self.indice)
         if not self.pendientes:
-            await interaction.response.edit_message(
-                content="✅ Todos los uniformes han sido procesados.", embed=None, view=None)
-            return
-        self.panel_view.indice = min(self.indice, len(self.pendientes) - 1)
+            await interaction.response.edit_message(content="✅ Todos los uniformes procesados.", embed=None, view=None); return
+        self.panel_view.indice = min(self.indice, len(self.pendientes)-1)
         self.panel_view._update_buttons()
         await interaction.response.edit_message(embed=self.panel_view.build_embed(), view=self.panel_view)
 
 
-# ──────────────────────────────────────────────
-# VIEW — Panel de personajes con navegación (slide)
-# ──────────────────────────────────────────────
-
 class MisPersonajesView(discord.ui.View):
-    def __init__(self, personajes: list, embed_slots: discord.Embed):
+    def __init__(self, personajes, embed_slots):
         super().__init__(timeout=120)
-        self.personajes  = personajes
-        self.embed_slots = embed_slots
-        self.indice      = 0
-        self.mostrando_personajes = False
-
-        if not personajes:
-            self.ver_personajes.disabled = True
-
-    def build_personaje_embed(self) -> discord.Embed:
+        self.personajes = personajes; self.embed_slots = embed_slots
+        self.indice = 0; self.mostrando_personajes = False
+        if not personajes: self.ver_personajes.disabled = True
+    def build_personaje_embed(self):
         if not self.personajes:
             return discord.Embed(title="Sin personajes", description="No tienes personajes registrados.", color=COLOR_INFO)
-        p     = self.personajes[self.indice]
-        total = len(self.personajes)
-        iconos = {"estudiante": "🎓", "profesor": "🧑‍🏫", "trabajador": "🧑‍💼"}
-        embed = discord.Embed(
-            title=f"{iconos.get(p['tipo'],'📋')} {p['personaje']} ({self.indice+1}/{total})",
-            color=COLOR_INFO)
-        embed.add_field(name="Tipo",   value=p["tipo"].capitalize(), inline=True)
-        embed.add_field(name="Detalle",value=p["detalle"],            inline=True)
+        p = self.personajes[self.indice]; total = len(self.personajes)
+        iconos = {"estudiante":"🎓","profesor":"🧑‍🏫","trabajador":"🧑‍💼"}
+        embed = discord.Embed(title=f"{iconos.get(p['tipo'],'📋')} {p['personaje']} ({self.indice+1}/{total})", color=COLOR_INFO)
+        embed.add_field(name="Tipo", value=p["tipo"].capitalize(), inline=True)
+        embed.add_field(name="Detalle", value=p["detalle"], inline=True)
         return embed
-
     @discord.ui.button(label="👁 Ver personajes", style=discord.ButtonStyle.primary)
-    async def ver_personajes(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.mostrando_personajes = True
-        self.indice = 0
-        self.ver_personajes.disabled  = True
-        self.volver_slots.disabled    = False
-        self.anterior.disabled        = True
-        self.siguiente.disabled       = len(self.personajes) <= 1
+    async def ver_personajes(self, interaction, button):
+        self.mostrando_personajes = True; self.indice = 0
+        self.ver_personajes.disabled = True; self.volver_slots.disabled = False
+        self.anterior.disabled = True; self.siguiente.disabled = len(self.personajes) <= 1
         await interaction.response.edit_message(embed=self.build_personaje_embed(), view=self)
-
     @discord.ui.button(label="↩ Volver a slots", style=discord.ButtonStyle.secondary, disabled=True)
-    async def volver_slots(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.mostrando_personajes = False
-        self.ver_personajes.disabled = False
-        self.volver_slots.disabled   = True
-        self.anterior.disabled       = True
-        self.siguiente.disabled      = True
+    async def volver_slots(self, interaction, button):
+        self.mostrando_personajes = False; self.ver_personajes.disabled = False
+        self.volver_slots.disabled = True; self.anterior.disabled = True; self.siguiente.disabled = True
         await interaction.response.edit_message(embed=self.embed_slots, view=self)
-
     @discord.ui.button(label="◀", style=discord.ButtonStyle.secondary, disabled=True, row=1)
-    async def anterior(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.indice = max(0, self.indice - 1)
-        self.anterior.disabled  = self.indice == 0
-        self.siguiente.disabled = self.indice >= len(self.personajes) - 1
+    async def anterior(self, interaction, button):
+        self.indice = max(0, self.indice-1)
+        self.anterior.disabled = self.indice == 0; self.siguiente.disabled = self.indice >= len(self.personajes)-1
         await interaction.response.edit_message(embed=self.build_personaje_embed(), view=self)
-
     @discord.ui.button(label="▶", style=discord.ButtonStyle.secondary, disabled=True, row=1)
-    async def siguiente(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.indice = min(len(self.personajes) - 1, self.indice + 1)
-        self.anterior.disabled  = self.indice == 0
-        self.siguiente.disabled = self.indice >= len(self.personajes) - 1
+    async def siguiente(self, interaction, button):
+        self.indice = min(len(self.personajes)-1, self.indice+1)
+        self.anterior.disabled = self.indice == 0; self.siguiente.disabled = self.indice >= len(self.personajes)-1
         await interaction.response.edit_message(embed=self.build_personaje_embed(), view=self)
 
-
-# ──────────────────────────────────────────────
-# VIEW — Confirmar eliminación (staff)
-# ──────────────────────────────────────────────
 
 class EliminarPersonajeView(discord.ui.View):
-    def __init__(self, user_id: int, personaje: str, tipo: str):
+    def __init__(self, user_id, personaje, tipo):
         super().__init__(timeout=None)
-        self.user_id   = user_id
-        self.personaje = personaje
-        self.tipo      = tipo
-
+        self.user_id = user_id; self.personaje = personaje; self.tipo = tipo
     @discord.ui.button(label="✅ Aprobar eliminación", style=discord.ButtonStyle.danger)
-    async def aprobar(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def aprobar(self, interaction, button):
         from utils.sheets import eliminar_personaje_sheets
         from utils.database import restar_personaje
-
         eliminado = eliminar_personaje_sheets(self.user_id, self.personaje, self.tipo)
         gen = cargar_generacion()
-        try:
-            await restar_personaje(self.user_id, f"{self.tipo}s", gen)
-        except Exception as e:
-            print(f"[ADMIN] Error restando slot: {e}")
-
+        try: await restar_personaje(self.user_id, f"{self.tipo}s", gen)
+        except Exception as e: print(f"[ADMIN] {e}")
         try:
             usuario = interaction.guild.get_member(self.user_id) or await interaction.guild.fetch_member(self.user_id)
             if usuario:
-                embed_u = discord.Embed(title="🗑️ Personaje eliminado",
-                    description=f"Tu personaje **{self.personaje}** fue eliminado. Tu slot fue liberado.",
-                    color=COLOR_INFO)
-                try: await usuario.send(embed=embed_u)
+                try: await usuario.send(embed=discord.Embed(title="🗑️ Personaje eliminado",
+                    description=f"Tu personaje **{self.personaje}** fue eliminado. Tu slot fue liberado.", color=COLOR_INFO))
                 except Exception: pass
         except Exception: pass
-
         updated = discord.Embed(title="🗑️ Eliminación aprobada",
-            description=(f"**Personaje:** {self.personaje}\n**Usuario:** <@{self.user_id}>\n"
-                f"{'✅ Eliminado de Sheets.' if eliminado else '⚠️ No encontrado en Sheets.'}"),
+            description=f"**Personaje:** {self.personaje}\n**Usuario:** <@{self.user_id}>\n{'✅ Eliminado.' if eliminado else '⚠️ No encontrado.'}",
             color=COLOR_APROBADO)
         updated.set_footer(text=f"Aprobado por {interaction.user.display_name}")
         await interaction.message.edit(embed=updated, view=None)
         await interaction.response.send_message("✅ Eliminación procesada.", ephemeral=True)
-
     @discord.ui.button(label="❌ Rechazar solicitud", style=discord.ButtonStyle.secondary)
-    async def rechazar(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def rechazar(self, interaction, button):
         try:
             usuario = interaction.guild.get_member(self.user_id) or await interaction.guild.fetch_member(self.user_id)
             if usuario:
-                embed_u = discord.Embed(title="❌ Solicitud rechazada",
-                    description=f"Tu solicitud para eliminar **{self.personaje}** fue rechazada.",
-                    color=COLOR_RECHAZADO)
-                try: await usuario.send(embed=embed_u)
+                try: await usuario.send(embed=discord.Embed(title="❌ Solicitud rechazada",
+                    description=f"Tu solicitud para eliminar **{self.personaje}** fue rechazada.", color=COLOR_RECHAZADO))
                 except Exception: pass
         except Exception: pass
         updated = discord.Embed(title="🗑️ Solicitud rechazada",
-            description=f"**Personaje:** {self.personaje}\n**Usuario:** <@{self.user_id}>",
-            color=COLOR_RECHAZADO)
+            description=f"**Personaje:** {self.personaje}\n**Usuario:** <@{self.user_id}>", color=COLOR_RECHAZADO)
         updated.set_footer(text=f"Rechazado por {interaction.user.display_name}")
         await interaction.message.edit(embed=updated, view=None)
         await interaction.response.send_message("✅ Rechazado.", ephemeral=True)
 
 
-# ──────────────────────────────────────────────
-# VIEW — Confirmar cambio de generación
-# ──────────────────────────────────────────────
-
 class ConfirmarCambioGenView(discord.ui.View):
     def __init__(self, gen_actual, gen_nueva):
         super().__init__(timeout=60)
-        self.gen_actual = gen_actual
-        self.gen_nueva  = gen_nueva
-
+        self.gen_actual = gen_actual; self.gen_nueva = gen_nueva
     @discord.ui.button(label="✅ Confirmar", style=discord.ButtonStyle.danger)
-    async def confirmar(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def confirmar(self, interaction, button):
         guardar_generacion(self.gen_nueva)
-        import utils.constants as const
-        const.GENERACION_ACTUAL = self.gen_nueva
-        await interaction.response.edit_message(
-            embed=discord.Embed(title="✅ Generación actualizada",
-                description=f"Ahora en **Gen {self.gen_nueva}** (Server Gen {self.gen_nueva+3}).",
-                color=COLOR_APROBADO), view=None)
+        import utils.constants as const; const.GENERACION_ACTUAL = self.gen_nueva
+        await interaction.response.edit_message(embed=discord.Embed(title="✅ Generación actualizada",
+            description=f"Ahora en **Gen {self.gen_nueva}** (Server Gen {self.gen_nueva+3}).", color=COLOR_APROBADO), view=None)
         self.stop()
-
     @discord.ui.button(label="❌ Cancelar", style=discord.ButtonStyle.secondary)
-    async def cancelar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(content="Cancelado.", embed=None, view=None)
-        self.stop()
+    async def cancelar(self, interaction, button):
+        await interaction.response.edit_message(content="Cancelado.", embed=None, view=None); self.stop()
 
 
 async def setup(bot):
