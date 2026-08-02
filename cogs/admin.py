@@ -89,8 +89,10 @@ class Admin(commands.Cog):
         from utils.database import get_conteo_usuario
         from utils.constants import SLOTS_CONFIG
         from utils.sheets import get_personajes_usuario
-        gen    = cargar_generacion()
+        gen = cargar_generacion()
+        print(f"[DEBUG] mis_personajes — gen={gen} — env={os.getenv('GENERACION_ACTUAL')}")
         conteo = await get_conteo_usuario(interaction.user.id, gen)
+        print(f"[DEBUG] conteo={dict(conteo)}")
         config = SLOTS_CONFIG.get(gen, SLOTS_CONFIG["default"])
         personajes = get_personajes_usuario(interaction.user.id)
         def barra(usado, limite):
