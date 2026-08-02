@@ -365,6 +365,7 @@ async def load_cogs():
         "cogs.generar_id",
         "cogs.ver_id",
         "cogs.spins",
+        "cogs.fix_gen2_cmd",
     ]
     for cog in cogs:
         try:
