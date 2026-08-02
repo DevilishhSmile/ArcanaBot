@@ -31,7 +31,6 @@ async def get_conteo_usuario(user_id: int, generacion: int) -> dict:
         db.row_factory = aiosqlite.Row
         row = await _get_o_crear(db, user_id, generacion)
         result = dict(row)
-        print(f"[DB] get_conteo user={user_id} gen={generacion} → {result}")
         return result
 
 async def puede_registrar(user_id: int, tipo: str, generacion: int, limite) -> dict:
