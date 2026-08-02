@@ -11,6 +11,20 @@ from utils.constants import (
 GEN_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "generacion.json")
 
 def cargar_generacion() -> int:
+    """
+    Lee la generación activa. Prioridad:
+    1. Variable de entorno GENERACION_ACTUAL (Railway — persiste entre deploys)
+    2. Archivo data/generacion.json (local)
+    3. Valor por defecto: 1
+    """
+    # Primero intentar variable de entorno
+    env_gen = os.getenv("GENERACION_ACTUAL")
+    if env_gen:
+        try:
+            return int(env_gen)
+        except ValueError:
+            pass
+    # Fallback: archivo local
     try:
         with open(GEN_FILE, "r") as f:
             return json.load(f).get("generacion_actual", 1)
@@ -18,9 +32,20 @@ def cargar_generacion() -> int:
         return 1
 
 def guardar_generacion(gen: int):
-    os.makedirs(os.path.dirname(GEN_FILE), exist_ok=True)
-    with open(GEN_FILE, "w") as f:
-        json.dump({"generacion_actual": gen}, f)
+    """
+    Guarda la generación activa.
+    - Actualiza el archivo local (para desarrollo)
+    - Imprime instrucción para actualizar Railway manualmente
+    """
+    # Guardar en archivo local
+    try:
+        os.makedirs(os.path.dirname(GEN_FILE), exist_ok=True)
+        with open(GEN_FILE, "w") as f:
+            json.dump({"generacion_actual": gen}, f)
+    except Exception as e:
+        print(f"[ADMIN] Error guardando generacion.json: {e}")
+    # Recordatorio para Railway
+    print(f"[ADMIN] ⚠️  Recuerda actualizar GENERACION_ACTUAL={gen} en las variables de Railway.")
 
 
 class Admin(commands.Cog):
