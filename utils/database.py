@@ -72,10 +72,13 @@ async def get_conteo_usuario(user_id: int, generacion: int) -> dict:
     Los slots extra vienen de SQLite.
     """
     # Slots extra desde SQLite
+    async def get_conteo_usuario(user_id: int, generacion: int) -> dict:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         row = await _get_o_crear(db, user_id, generacion)
-        sqlite_data = dict(row)
+        result = dict(row)
+        print(f"[DB] get_conteo_usuario user={user_id} gen={generacion} → {result}")
+        return result
 
     # Conteo real desde Sheets
     sheets_conteo = await _contar_desde_sheets_async(user_id)
