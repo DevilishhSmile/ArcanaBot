@@ -4,7 +4,8 @@ from discord.ext import commands
 import aiosqlite, os
 from utils.constants import GUILD_ID, ROL_STAFF
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "isefora.db")
+# Importar el DB_PATH directamente desde database.py
+from utils.database import DB_PATH
 
 class DebugDB(commands.Cog):
     def __init__(self, bot):
@@ -16,18 +17,29 @@ class DebugDB(commands.Cog):
         if not any(r.id == ROL_STAFF for r in interaction.user.roles):
             await interaction.response.send_message("❌", ephemeral=True); return
         await interaction.response.defer(ephemeral=True)
+
         from cogs.admin import cargar_generacion
         gen_actual = cargar_generacion()
+        existe = os.path.exists(DB_PATH)
+        tamano = os.path.getsize(DB_PATH) if existe else 0
+
         async with aiosqlite.connect(DB_PATH) as db:
-            cur = await db.execute("SELECT user_id, generacion, estudiantes_usados, profesores_usados, trabajadores_usados FROM slots_usuarios ORDER BY generacion, user_id")
+            cur = await db.execute(
+                "SELECT user_id, generacion, estudiantes_usados, profesores_usados, trabajadores_usados "
+                "FROM slots_usuarios ORDER BY generacion, user_id")
             rows = await cur.fetchall()
-        if not rows:
-            await interaction.followup.send("La base de datos está completamente vacía.", ephemeral=True)
-            return
-        lineas = [f"`generacion_actual = {gen_actual}`\n"]
+
+        lineas = [
+            f"**DB_PATH:** `{DB_PATH}`",
+            f"**Existe:** {existe} | **Tamaño:** {tamano} bytes",
+            f"**Gen actual:** `{gen_actual}`",
+            f"**Registros:** {len(rows)}",
+            "",
+        ]
         for r in rows:
             lineas.append(f"user=`{r[0]}` gen=`{r[1]}` | est={r[2]} prof={r[3]} trab={r[4]}")
-        await interaction.followup.send("\n".join(lineas[:25]), ephemeral=True)
+
+        await interaction.followup.send("\n".join(lineas[:30]), ephemeral=True)
 
     @app_commands.command(name="reset-gen", description="[STAFF] Resetear slots de una generación a 0.")
     @app_commands.describe(generacion="Número de generación a resetear")
@@ -36,10 +48,11 @@ class DebugDB(commands.Cog):
         if not any(r.id == ROL_STAFF for r in interaction.user.roles):
             await interaction.response.send_message("❌", ephemeral=True); return
         await interaction.response.defer(ephemeral=True)
+
         async with aiosqlite.connect(DB_PATH) as db:
             cur = await db.execute(
-                "SELECT user_id, estudiantes_usados, profesores_usados, trabajadores_usados FROM slots_usuarios WHERE generacion = ?",
-                (generacion,))
+                "SELECT user_id, estudiantes_usados, profesores_usados, trabajadores_usados "
+                "FROM slots_usuarios WHERE generacion = ?", (generacion,))
             rows = await cur.fetchall()
             await db.execute("""
                 UPDATE slots_usuarios SET
@@ -51,13 +64,14 @@ class DebugDB(commands.Cog):
                 WHERE generacion = ?
             """, (generacion,))
             await db.commit()
+
         detalle = "\n".join(
             f"• `{r[0]}` — est:{r[1]} prof:{r[2]} trab:{r[3]}"
-            for r in rows
-        ) or "Ninguno"
+            for r in rows) or "Ninguno"
+
         embed = discord.Embed(
             title=f"✅ Gen {generacion} reseteada",
-            description=f"**{len(rows)} usuario(s) reseteados:**\n{detalle}",
+            description=f"**DB:** `{DB_PATH}`\n**{len(rows)} usuario(s) reseteados:**\n{detalle}",
             color=0x27AE60)
         await interaction.followup.send(embed=embed, ephemeral=True)
 
