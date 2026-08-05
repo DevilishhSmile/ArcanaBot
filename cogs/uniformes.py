@@ -10,6 +10,8 @@ from utils.helpers import is_valid_character_name, clean_field, build_review_emb
 from utils.sheets import aprobar_uniforme, rechazar_uniforme
 from utils.image_handler import registrar_espera
 
+VERSIONES_UNIFORME = ["Diplomático", "Militarizado"]
+
 
 class UniformeModal(discord.ui.Modal, title="👕 Registro de Uniforme"):
     personaje = discord.ui.TextInput(
@@ -45,6 +47,8 @@ class UniformeModal(discord.ui.Modal, title="👕 Registro de Uniforme"):
         )
 
 
+# ── SELECTOR DE CASA ──────────────────────────
+
 class CasaSelect(discord.ui.Select):
     def __init__(self):
         options = [
@@ -67,22 +71,16 @@ class CasaSelect(discord.ui.Select):
         data["casa"] = casa
         temp[interaction.user.id] = data
 
-        # Registrar espera de imagen
-        registrar_espera(
-            user_id=interaction.user.id,
-            tipo="uniforme",
-            canal_id=view.canal_id,
-            data=data,
-        )
-
+        # Pasar al selector de versión de uniforme
         await interaction.response.edit_message(
             content=(
                 f"✅ **Casa:** {casa}\n\n"
-                f"📎 Ahora **envía la imagen del uniforme en este canal**.\n"
-                f"Pégala desde el portapapeles 📋 o adjúntala desde tu galería 🖼️\n\n"
-                f"*Escribe `sin imagen` si no tienes una todavía.*"
+                f"👔 Ahora selecciona la **versión del uniforme**:"
             ),
-            view=None,
+            view=VersionSelectView(
+                user_id=interaction.user.id,
+                canal_id=view.canal_id,
+            ),
         )
         view.stop()
 
@@ -94,6 +92,67 @@ class CasaSelectView(discord.ui.View):
         self.canal_id = canal_id
         self.add_item(CasaSelect())
 
+
+# ── SELECTOR DE VERSIÓN DE UNIFORME ──────────
+
+class VersionSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(
+                label="🎩 Diplomático",
+                value="Diplomático",
+                description="Uniforme de estilo formal y diplomático",
+            ),
+            discord.SelectOption(
+                label="⚔️ Militarizado",
+                value="Militarizado",
+                description="Uniforme de estilo militar y estructurado",
+            ),
+        ]
+        super().__init__(
+            placeholder="👔 Selecciona la versión del uniforme...",
+            min_values=1, max_values=1,
+            options=options,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        version = self.values[0]
+        view: VersionSelectView = self.view
+
+        # Guardar versión en temp y registrar espera de imagen
+        temp = getattr(interaction.client, "_uniforme_temp", {})
+        data = temp.get(interaction.user.id, {})
+        data["version_uniforme"] = version
+        temp[interaction.user.id] = data
+
+        registrar_espera(
+            user_id=interaction.user.id,
+            tipo="uniforme",
+            canal_id=view.canal_id,
+            data=data,
+        )
+
+        await interaction.response.edit_message(
+            content=(
+                f"✅ **Versión:** {version}\n\n"
+                f"📎 Ahora **envía la imagen del uniforme en este canal**.\n"
+                f"Pégala desde el portapapeles 📋 o adjúntala desde tu galería 🖼️\n\n"
+                f"*Escribe `sin imagen` si no tienes una todavía.*"
+            ),
+            view=None,
+        )
+        view.stop()
+
+
+class VersionSelectView(discord.ui.View):
+    def __init__(self, user_id: int, canal_id: int):
+        super().__init__(timeout=120)
+        self.user_id  = user_id
+        self.canal_id = canal_id
+        self.add_item(VersionSelect())
+
+
+# ── MODAL DE RECHAZO ─────────────────────────
 
 class RechazoUniformeModal(discord.ui.Modal, title="✏️ Motivo de rechazo"):
     motivo = discord.ui.TextInput(
@@ -143,6 +202,7 @@ class RechazoUniformeModal(discord.ui.Modal, title="✏️ Motivo de rechazo"):
             description=(
                 f"**Personaje:** {self.data['personaje']}\n"
                 f"**Casa:** {self.data.get('casa','—')}\n"
+                f"**Versión:** {self.data.get('version_uniforme','—')}\n"
                 f"**Usuario:** <@{self.data['user_id']}>\n\n"
                 f"**Motivo:**\n{m}"
             ),
@@ -152,6 +212,8 @@ class RechazoUniformeModal(discord.ui.Modal, title="✏️ Motivo de rechazo"):
         await self.review_message.edit(embed=updated, view=None)
         await interaction.response.send_message("✅ Rechazo procesado.", ephemeral=True)
 
+
+# ── REVIEW VIEW ───────────────────────────────
 
 class UniformeReviewView(discord.ui.View):
     def __init__(self, data):
@@ -182,7 +244,9 @@ class UniformeReviewView(discord.ui.View):
             description=(
                 f"¡Felicidades <@{self.data['user_id']}>! "
                 f"Tu uniforme para **{self.data['personaje']}** "
-                f"(Casa **{self.data.get('casa','—')}**) fue aprobado. 🎉\n\n"
+                f"(Casa **{self.data.get('casa','—')}** — "
+                f"Versión **{self.data.get('version_uniforme','—')}**) "
+                f"fue aprobado. 🎉\n\n"
                 f"Ya puedes registrar tu ficha."
             ),
             color=COLOR_APROBADO,
@@ -203,6 +267,7 @@ class UniformeReviewView(discord.ui.View):
             description=(
                 f"**Personaje:** {self.data['personaje']}\n"
                 f"**Casa:** {self.data.get('casa','—')}\n"
+                f"**Versión:** {self.data.get('version_uniforme','—')}\n"
                 f"**Usuario:** <@{self.data['user_id']}>"
             ),
             color=COLOR_APROBADO,
@@ -222,6 +287,8 @@ class UniformeReviewView(discord.ui.View):
         await interaction.response.send_modal(
             RechazoUniformeModal(data=self.data, review_message=interaction.message))
 
+
+# ── COG ───────────────────────────────────────
 
 class Uniformes(commands.Cog):
     def __init__(self, bot):
