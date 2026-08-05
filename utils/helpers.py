@@ -194,7 +194,8 @@ def build_review_embed(tipo: str, data: dict, color=None) -> discord.Embed:
     embed.add_field(name="Personaje", value=data.get("personaje","—"), inline=True)
 
     if tipo == "uniforme":
-        embed.add_field(name="Casa", value=data.get("casa","—"), inline=True)
+        embed.add_field(name="Casa",    value=data.get("casa","—"),             inline=True)
+        embed.add_field(name="Versión", value=data.get("version_uniforme","—"), inline=True)
         if data.get("imagen"): embed.set_image(url=data["imagen"])
         return embed
 
