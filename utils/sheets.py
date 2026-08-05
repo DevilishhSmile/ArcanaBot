@@ -141,7 +141,6 @@ def has_approved_uniform(user_id, character_name) -> bool:
 
 # ──────────────────────────────────────────────
 # ESTUDIANTES
-# ── FIX: aprobar_estudiante ahora guarda especie y casa ──
 # ──────────────────────────────────────────────
 
 def guardar_estudiante_pendiente(data, generacion, mensaje_id=0):
@@ -152,26 +151,19 @@ def guardar_estudiante_pendiente(data, generacion, mensaje_id=0):
     ], value_input_option="USER_ENTERED")
 
 def aprobar_estudiante(data, generacion, staff_username, link_ficha=""):
-    """
-    Guarda el estudiante aprobado en EstudiantesAprobados.
-    Columnas: user_id | username | personaje | elemento | club |
-              link_ficha | fecha | staff_que_reviso | generacion | especie | casa
-    Las columnas especie y casa deben existir en la hoja (añadirlas manualmente si no están).
-    """
     get_sheet("EstudiantesAprobados").append_row([
         str(data["user_id"]),
         data["username"],
         data["personaje"],
         data.get("elemento", ""),
-        # club: puede ser lista o string
         ", ".join(data.get("clubes_nombres", [])) if isinstance(data.get("clubes_nombres"), list)
             else data.get("club", ""),
         link_ficha,
         _now(),
         staff_username,
         str(generacion),
-        data.get("especie", ""),   # columna especie — añadir a la hoja
-        data.get("casa", ""),      # columna casa    — añadir a la hoja
+        data.get("especie", ""),
+        data.get("casa", ""),
     ], value_input_option="USER_ENTERED")
     _actualizar_estado("EstudiantesPendientes", data["user_id"], data["personaje"],
                        estado="APROBADO", staff=staff_username)
@@ -184,7 +176,6 @@ def rechazar_estudiante(data, staff_username, motivo):
 
 # ──────────────────────────────────────────────
 # TRABAJOS
-# ── FIX: aprobar_profesor/trabajador ahora guarda casa ──
 # ──────────────────────────────────────────────
 
 def guardar_trabajo_pendiente(data, tipo, mensaje_id=0):
@@ -197,10 +188,6 @@ def guardar_trabajo_pendiente(data, tipo, mensaje_id=0):
     ], value_input_option="USER_ENTERED")
 
 def aprobar_profesor(data, generacion, staff_username, link_ficha=""):
-    """
-    Columnas: user_id | username | personaje | materia | subcargo (si aplica) |
-              link_ficha | fecha | staff_que_reviso | estado | generacion
-    """
     get_sheet("Profesores").append_row([
         str(data["user_id"]),
         data["username"],
@@ -217,10 +204,6 @@ def aprobar_profesor(data, generacion, staff_username, link_ficha=""):
     actualizar_global_stats()
 
 def aprobar_trabajador(data, generacion, staff_username, link_ficha=""):
-    """
-    Columnas: user_id | username | personaje | cargo | subcargo (si aplica) |
-              link_ficha | fecha | staff_que_reviso | estado | generacion
-    """
     get_sheet("Trabajadores").append_row([
         str(data["user_id"]),
         data["username"],
@@ -265,10 +248,6 @@ def eliminar_personaje_sheets(user_id: int, personaje: str, tipo: str) -> bool:
         return False
 
 def get_personajes_usuario(user_id: int) -> list:
-    """
-    Devuelve todos los personajes aprobados de un usuario.
-    FIX: ahora incluye especie, elemento, casa para el sistema de IDs.
-    """
     personajes = []
     try:
         for r in get_all_rows("EstudiantesAprobados"):
@@ -277,7 +256,6 @@ def get_personajes_usuario(user_id: int) -> list:
                     "tipo":      "estudiante",
                     "personaje": r.get("personaje", ""),
                     "detalle":   r.get("elemento", ""),
-                    # Datos completos para el ID
                     "elemento":  r.get("elemento", ""),
                     "especie":   r.get("especie", ""),
                     "casa":      r.get("casa", ""),
@@ -291,7 +269,6 @@ def get_personajes_usuario(user_id: int) -> list:
                     "tipo":      "profesor",
                     "personaje": r.get("personaje", ""),
                     "detalle":   r.get("materia", ""),
-                    # Datos completos para el ID
                     "materia":   r.get("materia", ""),
                     "subcargo":  r.get("subcargo (si aplica)", ""),
                     "fecha_aprobacion": r.get("fecha", ""),
@@ -304,7 +281,6 @@ def get_personajes_usuario(user_id: int) -> list:
                     "tipo":      "trabajador",
                     "personaje": r.get("personaje", ""),
                     "detalle":   r.get("cargo", ""),
-                    # Datos completos para el ID
                     "cargo":     r.get("cargo", ""),
                     "subcargo":  r.get("subcargo (si aplica)", ""),
                     "fecha_aprobacion": r.get("fecha", ""),
@@ -313,15 +289,25 @@ def get_personajes_usuario(user_id: int) -> list:
     return personajes
 
 def get_profesores_aprobados_por_materia(materia) -> int:
+    """Filtra por generación activa para no contar personajes de gens anteriores."""
+    from cogs.admin import cargar_generacion
+    gen = cargar_generacion()
     try:
         return sum(1 for r in get_all_rows("Profesores")
-                   if r.get("materia","").strip() == materia and r.get("estado","").upper() == "APROBADO")
+                   if r.get("materia","").strip() == materia
+                   and r.get("estado","").upper() == "APROBADO"
+                   and str(r.get("generacion","")) == str(gen))
     except Exception: return 0
 
 def get_trabajadores_aprobados_por_cargo(cargo) -> int:
+    """Filtra por generación activa para no contar personajes de gens anteriores."""
+    from cogs.admin import cargar_generacion
+    gen = cargar_generacion()
     try:
         return sum(1 for r in get_all_rows("Trabajadores")
-                   if r.get("cargo","").strip() == cargo and r.get("estado","").upper() == "APROBADO")
+                   if r.get("cargo","").strip() == cargo
+                   and r.get("estado","").upper() == "APROBADO"
+                   and str(r.get("generacion","")) == str(gen))
     except Exception: return 0
 
 # ── HELPERS INTERNOS ──────────────────────────
