@@ -30,7 +30,7 @@ CANAL_FICHAS_TRABAJADORES  = int(os.getenv("CANAL_FICHAS_TRABAJADORES", 0))
 CANAL_REVISION_UNIFORMES   = int(os.getenv("CANAL_REVISION_UNIFORMES", 0))
 CANAL_REVISION_FICHAS      = int(os.getenv("CANAL_REVISION_FICHAS", 0))
 CANAL_LOGS_BOT             = int(os.getenv("CANAL_LOGS_BOT", 0))
-CANAL_SANCIONES            = int(os.getenv("CANAL_SANCIONES", 0))  # Canal donde se notifican sanciones
+CANAL_SANCIONES            = int(os.getenv("CANAL_SANCIONES", 0))
 
 ROL_STAFF          = int(os.getenv("ROL_STAFF", 0))
 ROL_ESTUDIANTE     = int(os.getenv("ROL_ESTUDIANTE", 0))
@@ -38,10 +38,8 @@ ROL_PROFESOR       = int(os.getenv("ROL_PROFESOR", 0))
 ROL_TRABAJADOR     = int(os.getenv("ROL_TRABAJADOR", 0))
 ROL_SLOT_ADICIONAL = 1217564303612182610
 ROL_REGISTRADO     = 1221480425042739363
-ROL_CONSEJO        = 1187541476415119370  # Consejo Estudiantil — puede asignar PC
+ROL_CONSEJO        = 1187541476415119370
 
-# Roles que pueden asignar PC y aplicar sanciones
-# ── EDITAR AQUÍ si cambian los roles con autoridad ──
 ROLES_AUTORIDAD_PC = [ROL_STAFF, ROL_PROFESOR, ROL_CONSEJO]
 
 COLOR_PENDIENTE  = 0x9B59B6
@@ -52,11 +50,10 @@ COLOR_ACEPTACION = 0x9B59B6
 
 # =============================================
 # CASAS — EDITAR AQUÍ si cambian
-# Las 4 casas de la Academia Arcana Isefora
-# El personaje elige su casa al registrarse
+# Solo los estudiantes eligen casa al registrarse
 # basándose en el cuestionario de personalidad
 # =============================================
-CASAS = ["Redmeadow", "Ledacrealis", "Rongshakti", "Acrom"]
+CASAS = ["Redmeadow", "Ledacrealis", "Ravyelle", "Azorya"]
 
 # =============================================
 # CARGOS — EDITAR AQUÍ
@@ -117,11 +114,8 @@ CLUBES = {
 
 # =============================================
 # SISTEMA PCA — Puntos de Canje Académico
-# ── EDITAR AQUÍ si cambian las reglas ──
 # =============================================
 
-# Tabla de notas → PC
-# Formato: (nota_minima, nota_maxima, pc_otorgados)
 TABLA_NOTAS_PC = [
     (3.5, 3.5,  1),
     (3.6, 3.9,  3),
@@ -130,48 +124,45 @@ TABLA_NOTAS_PC = [
     (5.0, 5.0, 10),
 ]
 
-# Trabajo sucio del Consejo: rango de PC permitido
 PC_TRABAJO_SUCIO_MIN = 5
 PC_TRABAJO_SUCIO_MAX = 10
 
-# Tipos de sanción
 TIPOS_SANCION = {
     "castigo_menor": {
-        "nombre":        "Castigo Menor",
-        "duracion_min":  5,    # minutos
-        "duracion_max":  20,   # minutos
-        "canjeable_pct": 0.75, # 75% canjeable
-        "min_obligatorio": 5,  # minutos mínimos no canjeables
-        "pc_por_minuto": 1/1.5,  # 1 PC = 1.5 min → 1 min = 0.67 PC
-        "bonificacion_pc": 10,   # PC para activar bonificación
-        "bonificacion_min": 1,   # minutos extra de reducción con bonificación
-        "descripcion": "5-20 minutos de tiempo de rol",
+        "nombre":          "Castigo Menor",
+        "duracion_min":    5,
+        "duracion_max":    20,
+        "canjeable_pct":   0.75,
+        "min_obligatorio": 5,
+        "pc_por_minuto":   1/1.5,
+        "bonificacion_pc": 10,
+        "bonificacion_min":1,
+        "descripcion":     "5-20 minutos de tiempo de rol",
     },
     "detencion": {
-        "nombre":        "Detención",
-        "duracion_min":  30,   # minutos
-        "duracion_max":  120,  # minutos
-        "canjeable_pct": 0.80, # 80% canjeable
-        "min_obligatorio": None,  # calculado dinámicamente
-        "pc_por_minuto": 1/2.5,   # 1 PC = 2.5 min → 1 min = 0.4 PC
+        "nombre":          "Detención",
+        "duracion_min":    30,
+        "duracion_max":    120,
+        "canjeable_pct":   0.80,
+        "min_obligatorio": None,
+        "pc_por_minuto":   1/2.5,
         "bonificacion_pc": None,
-        "bonificacion_min": None,
-        "descripcion": "30-120 minutos de tiempo de rol",
+        "bonificacion_min":None,
+        "descripcion":     "30-120 minutos de tiempo de rol",
     },
     "suspension": {
-        "nombre":        "Suspensión",
-        "duracion_min":  2,    # días IRL
-        "duracion_max":  3,    # días IRL
-        "canjeable_pct": None, # solo se puede quitar 1 día por 20 PC
-        "min_obligatorio": 1,  # siempre queda al menos 1 día
-        "pc_por_dia": 20,      # 20 PC = 1 día menos
-        "descripcion": "2-3 días IRL (requiere autorización del staff)",
+        "nombre":              "Suspensión",
+        "duracion_min":        2,
+        "duracion_max":        3,
+        "canjeable_pct":       None,
+        "min_obligatorio":     1,
+        "pc_por_dia":          20,
+        "descripcion":         "2-3 días IRL (requiere autorización del staff)",
         "requiere_autorizacion": True,
     },
 }
 
 def calcular_pc_por_nota(nota: float) -> int:
-    """Retorna los PC correspondientes a una nota académica."""
     if nota < 3.5:
         return 0
     for (min_n, max_n, pc) in TABLA_NOTAS_PC:
@@ -180,26 +171,17 @@ def calcular_pc_por_nota(nota: float) -> int:
     return 0
 
 def calcular_reduccion_castigo_menor(pc_a_gastar: int, duracion: int = 20) -> dict:
-    """
-    Calcula la reducción para castigos menores.
-    Retorna dict con minutos_reducidos, tiempo_final, bonificacion_aplicada.
-    """
-    max_canjeable = int(duracion * 0.75)
-    min_obligatorio = duracion - max_canjeable  # normalmente 5 min
-
-    # Máximo PC que tiene sentido gastar
-    pc_max = 10  # para la reducción completa
-
-    pc = min(pc_a_gastar, pc_max)
+    max_canjeable   = int(duracion * 0.75)
+    min_obligatorio = duracion - max_canjeable
+    pc_max          = 10
+    pc              = min(pc_a_gastar, pc_max)
     minutos_reducidos = min(pc * 1.5, max_canjeable)
     bonificacion = False
-    bonus_min = 0
-
+    bonus_min    = 0
     if pc_a_gastar >= 10:
         bonificacion = True
-        bonus_min = 1
+        bonus_min    = 1
         minutos_reducidos += bonus_min
-
     tiempo_final = max(min_obligatorio - bonus_min, duracion - minutos_reducidos)
     return {
         "minutos_reducidos": minutos_reducidos,
@@ -209,16 +191,10 @@ def calcular_reduccion_castigo_menor(pc_a_gastar: int, duracion: int = 20) -> di
     }
 
 def calcular_reduccion_detencion(pc_a_gastar: int, duracion: int) -> dict:
-    """
-    Calcula la reducción para detención.
-    1 PC = 2.5 minutos. Máximo canjeable: 80%.
-    """
     max_canjeable   = int(duracion * 0.80)
     min_obligatorio = duracion - max_canjeable
-
     minutos_reducidos = min(pc_a_gastar * 2.5, max_canjeable)
     tiempo_final = max(min_obligatorio, duracion - minutos_reducidos)
-
     return {
         "minutos_reducidos": minutos_reducidos,
         "tiempo_final":      tiempo_final,
@@ -227,14 +203,10 @@ def calcular_reduccion_detencion(pc_a_gastar: int, duracion: int) -> dict:
     }
 
 def calcular_reduccion_suspension(pc_a_gastar: int, duracion_dias: int) -> dict:
-    """
-    20 PC = 1 día de reducción. Siempre queda al menos 1 día.
-    """
-    dias_reducibles = duracion_dias - 1  # siempre queda 1 día
+    dias_reducibles = duracion_dias - 1
     dias_a_reducir  = min(pc_a_gastar // 20, dias_reducibles)
     pc_usados       = dias_a_reducir * 20
     dias_final      = duracion_dias - dias_a_reducir
-
     return {
         "dias_reducidos": dias_a_reducir,
         "dias_final":     dias_final,
@@ -246,15 +218,14 @@ def calcular_reduccion_suspension(pc_a_gastar: int, duracion_dias: int) -> dict:
 # SISTEMA DE SPINS DE PODER
 # =============================================
 
-ROL_RESPIN = 1221473426573889699  # Rol de re-spin de tienda
+ROL_RESPIN = 1221473426573889699
 
-# Categorías de raza (asignadas por el staff al aprobar)
 CATEGORIAS_RAZA = {
     "basico": {
         "nombre": "Básico",
         "emoji":  "⚪",
         "desc":   "Humanos con chispa mágica, especies con sensibilidad elemental mínima, seres contemporáneos que despiertan al mundo mágico.",
-        "peso":   40,  # probabilidad relativa en el spin
+        "peso":   40,
     },
     "sensitivo": {
         "nombre": "Sensitivo",
@@ -294,14 +265,12 @@ CATEGORIAS_RAZA = {
     },
 }
 
-# Niveles de poder
 NIVELES_PODER = {
     "bajo":  {"nombre": "Bajo",  "emoji": "🟢", "desc": "Poderes en desarrollo, aún sin dominio completo."},
     "medio": {"nombre": "Medio", "emoji": "🟡", "desc": "Poderes estables con buen control y versatilidad."},
     "alto":  {"nombre": "Alto",  "emoji": "🔴", "desc": "Poderes dominados al máximo de su potencial."},
 }
 
-# Descripciones de maná (0-10)
 DESCRIPCIONES_MANA = {
     0:  "Sin rastro de maná — un mortal común.",
     1:  "Chispa mínima, apenas perceptible.",
@@ -316,4 +285,4 @@ DESCRIPCIONES_MANA = {
     10: "Ilimitado — una anomalía del archipiélago.",
 }
 
-CANAL_REVISION_PODER = None  # Usa CANAL_REVISION_FICHAS
+CANAL_REVISION_PODER = None
