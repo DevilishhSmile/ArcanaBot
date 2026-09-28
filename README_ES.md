@@ -20,7 +20,7 @@ ArcanaBot automatiza la gestión de personajes y flujos de moderación para serv
 - **Generación de carnet de identidad** — Carnets visuales con PIL/Pillow
 - **Panel de administración** — Estadísticas, gestión de generaciones y limpieza de datos
 - **Seguimiento de slots** — Límites configurables de personajes por generación
-- **Sistema de uniformes** — Versiones Diplomático / Militarizado con selector de casa
+- **Sistema de uniformes** — Versiones de uniformes diferentes + con selector de casa
 
 ---
 
