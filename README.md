@@ -448,6 +448,12 @@ You have two options for running the bot. Choose whichever works best for you:
 | **Difficulty** | Medium | Easy |
 | **Best for** | Active servers | Testing or small servers |
 
+> ⚠️ **Another thing to have in mind:** If you choose to run the bot from your PC, you'll have to start the bot again from the terminal everytime you turn your PC off.
+
+> 💡 **About Railway's cost:** Railway charges for actual usage. A small bot typically uses less than $1-2 of the monthly $5 credit. In practice you'll almost never hit the limit.
+
+> 🔍 **Want to explore other hosting options?** Services like **Fly.io**, **Oracle Cloud Free Tier**, **Render** or **DigitalOcean** can also work for hosting Discord bots. Each has its own setup process — if any of them interest you, feel free to ask your favorite AI how to set them up for a Python bot. 😊
+
 ---
 
 ### Option A — Railway (recommended for active servers)
