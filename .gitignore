@@ -1,0 +1,34 @@
+# ── Secrets & credentials ──────────────────────
+.env
+data/credentials.json
+
+# ── Database (auto-generated) ───────────────────
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# ── Generation file (server-specific) ───────────
+data/generacion.json
+
+# ── Python ──────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# ── IDE / OS ────────────────────────────────────
+.vs/
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
+
+# ── Logs ────────────────────────────────────────
+*.log
