@@ -1,438 +1,404 @@
-# 🔮 ArcanaBot — Discord RP Academy Bot
+# 🪄 ArcanaBot — Discord Bot for Roleplay Servers
 
-**ArcanaBot** is a fully-featured Discord bot designed for roleplay academy servers. It handles character registration, staff review workflows, academic points, power spins, battle systems, and much more — all integrated with Google Sheets for persistent data storage.
+> Character management bot for themed roleplay servers. Originally developed for **Academia Arcana Isefora** — adaptable for any similar community.
 
-> Built with ❤️ by **Agnes** · Need technical support? Contact: `devilishh.` on Discord
-
----
-
-## ✨ Features
-
-### 👕 Uniform System
-- Players submit their character's uniform via `/uniforme`
-- Select house and uniform version (Diplomatic / Militarized)
-- Staff reviews and approves/rejects with reason
-- Mass review panel with `/panel-uniformes`
-
-### 📋 Character Registration
-- **Students** (`/ficha-estudiante`) — up to 3 per user, requires approved uniform
-- **Professors** (`/ficha-profesor`) — up to 2 per user, subject selection
-- **Workers** (`/ficha-trabajador`) — up to 2 per user, position selection
-- Multi-part forms (data, powers/history, personality/hobbies)
-- House selection, club selection with automatic role assignment
-- Fully published in 2 messages to avoid Discord's 2000 char limit
-
-### 🪪 ID Card System
-- Auto-generated ID card on character approval
-- Manual generation with `/generar-id`
-- View any character's ID with `/ver-id`
-- Unique codes per character type (STU/PRF/WRK + sequential number)
-
-### ✏️ Character Editing
-- `/editar-ficha` — edit any approved character with pre-filled data
-- Changes go through staff review before publishing
-
-### ⚠️ Academic Points System (PCA)
-- Professors assign PC points by grade (3.5→1PC up to 5.0→10PC)
-- Council assigns direct PC for special tasks (5-10 PC)
-- Points can be redeemed to reduce sanctions
-- Sanction types: minor punishment, detention, suspension, expulsion
-- Automatic approval flow for suspensions and expulsions
-- Appeal system for suspensions/expulsions
-- Full history tracking in Google Sheets
-
-### ✨ Power Spin System
-- `/spin-poder` — generates random power stats (level + mana)
-- Staff assigns secret race category on approval (7 tiers: Basic to Divine)
-- Power sheet review with rejection protocol (4 rejections = assistance protocol)
-- Re-spin system via store item (Discord role)
-- Public power sheet viewing
-
-### ⚔️ Battle System
-- `/batalla @rival` — initiates a narrative battle
-- Probability-based hit calculation from power stats
-- Immersive narrative results via buttons (no extra commands needed)
-- Battle history tracked per character
-- Cancel or conclude battles at any time
-
-### 🎰 Slot System
-- Configurable slots per generation per character type
-- Extra slots via store role + `/reclamar-slot`
-- Per-generation tracking in SQLite
-
-### 📊 Admin Panel
-- `/admin-stats` — 5-section interactive panel:
-  - 📋 General (approvals, pending, quotas)
-  - ⚠️ Moderation (sanctions by type, top sanctioned, most active staff)
-  - 💎 PCA (PC totals, top characters, top assigners)
-  - ✨ Spins (approved/pending/rejected, by level and race category)
-  - ⚔️ Battles (total battles, top winners, most active)
-
-### 🗂️ Data Management
-- `/admin-data ver/eliminar-personaje/eliminar-tipo/reset-slots/reset-total`
-- Full user data control for staff
-
-### 📚 Generation System
-- Multi-generation support
-- `/generacion ver/cambiar/historial`
-- Generation persists via Railway environment variable
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
+[![discord.py 2.4.0](https://img.shields.io/badge/discord.py-2.4.0-5865F2.svg)](https://discordpy.readthedocs.io/)
+[![License CC BY-NC 4.0](https://img.shields.io/badge/license-CC%20BY--NC%204.0-green.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
 
 ---
 
-## 🛠️ Installation Guide
+## 📋 What does this bot do?
 
-### Prerequisites
+ArcanaBot automates character management and moderation workflows for themed Discord roleplay servers. It includes:
 
-| Tool | Version | Notes |
-|---|---|---|
-| Python | 3.11.x | Must be exactly 3.11 (3.13 removes `audioop`) |
-| Git | Any | For cloning and version control |
-| Node.js | 18+ | Only needed for local docx generation (optional) |
+- **Character sheet system** — Students, professors and workers with detailed profiles
+- **Staff review workflow** — Approve/reject with feedback in designated channels
+- **Academic Conduct Points (PCA)** — Sanctions, redemptions and appeals
+- **Power Spin system** — 7 secret weighted race categories with randomized draws
+- **Battle system** — Duels with results logged to Google Sheets
+- **ID card generation** — Visual ID cards built with PIL/Pillow
+- **Admin panel** — Stats, generation management and data cleanup
+- **Slot tracking** — Configurable per-generation character limits
+- **Uniform system** — Diplomatic / Militarized versions with house selector
 
 ---
 
-### STEP 1 — Install Python 3.11
+## ⚙️ Requirements
 
-1. Go to https://www.python.org/downloads/
-2. Download **Python 3.11.x** (not 3.12 or 3.13)
-3. During installation, check **"Add Python to PATH"** ✅
-4. Verify in terminal:
+- **Python 3.11 exactly** (Python 3.12+ removes `audioop`, which discord.py requires)
+- **Discord account and server**
+- **Google account** with Google Sheets access
+- **Railway or Render account** (for hosting, optional)
+
+---
+
+## 🚀 Installation
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/your-username/arcanabot.git
+cd arcanabot
+```
+
+### 2. Verify Python version
+
 ```bash
 python --version
-# Expected: Python 3.11.x
+# Should output: Python 3.11.x
 ```
 
----
+If you have a different version, download Python 3.11 from [python.org/downloads](https://www.python.org/downloads/release/python-3110/).
 
-### STEP 2 — Clone the repository
+For Railway, create a `.python-version` file in the project root:
 
-```bash
-git clone https://github.com/your-username/arcana-bot.git
-cd arcana-bot
+```
+3.11.9
 ```
 
-Or download the ZIP from GitHub and extract it.
-
----
-
-### STEP 3 — Create virtual environment and install dependencies
+### 3. Create and activate virtual environment
 
 ```bash
-# Create virtual environment
+# Windows
 python -m venv venv
-
-# Activate (Windows)
 venv\Scripts\activate
 
-# Activate (Mac/Linux)
+# macOS/Linux
+python -m venv venv
 source venv/bin/activate
+```
 
-# Install dependencies
+### 4. Install dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
-You should see `(venv)` in your terminal prompt.
+**requirements.txt:**
+```
+discord.py==2.4.0
+python-dotenv==1.0.0
+gspread==6.0.2
+google-auth==2.27.0
+aiosqlite==0.20.0
+Pillow
+```
 
 ---
 
-### STEP 4 — Create your Discord Bot
+## 🤖 Setting up the Discord Bot
 
-1. Go to https://discord.com/developers/applications
-2. Click **"New Application"** → give it a name → **Create**
-3. Go to **Bot** in the left menu
-4. Click **"Add Bot"** → confirm
-5. Enable these **Privileged Gateway Intents**:
+### 1. Create the bot application
+
+1. Go to [discord.com/developers/applications](https://discord.com/developers/applications)
+2. Click **New Application** → give it a name → Create
+3. Go to the **Bot** section → click **Add Bot**
+4. Enable the following **Privileged Gateway Intents**:
+   - ✅ Presence Intent
    - ✅ Server Members Intent
    - ✅ Message Content Intent
-6. Click **"Reset Token"** → copy it (you only see it once!)
 
-**Invite the bot to your server:**
+### 2. Copy the token
 
-1. Go to **OAuth2 → URL Generator**
-2. In **Scopes**, check: `bot` and `applications.commands`
-3. In **Bot Permissions**, check:
-   - Manage Roles
-   - Send Messages
-   - Embed Links
-   - Attach Files
-   - Read Message History
-   - Use Slash Commands
-4. Copy the generated URL, open it in your browser, select your server
+In the **Bot** section, click **Reset Token** and copy it. You'll need it for the `.env` file.
 
----
+### 3. Invite the bot to your server
 
-### STEP 5 — Set up Google Sheets
+Go to **OAuth2 → URL Generator** and select:
 
-1. Go to https://console.cloud.google.com/
-2. Create a new project
-3. Enable these APIs:
-   - **Google Sheets API**
-   - **Google Drive API**
-4. Go to **Credentials → Create Credentials → Service Account**
-5. Give it any name → **Create and Continue → Done**
-6. Click on the service account → **Keys → Add Key → JSON**
-7. Download the JSON file
-8. Rename it to `credentials.json` and place it in the `data/` folder
-9. Copy the service account email (looks like `bot@project.iam.gserviceaccount.com`)
-10. Create a new Google Spreadsheet
-11. Share it with the service account email with **Editor** permissions
-12. Copy the Spreadsheet ID from the URL:
-    `https://docs.google.com/spreadsheets/d/`**`THIS_IS_THE_ID`**`/edit`
+- **Scopes:** `bot`, `applications.commands`
+- **Bot Permissions:**
+  - `Send Messages`
+  - `Embed Links`
+  - `Attach Files`
+  - `Read Message History`
+  - `Use External Emojis`
+  - `Add Reactions`
+  - `Manage Roles` (for automatic role assignment)
 
-**Create these sheets (tabs) in the spreadsheet** with exactly these column headers in row 1:
-
-| Sheet Name | Columns (row 1) |
-|---|---|
-| `UniformesPendientes` | user_id, username, personaje, link_imagen, fecha, estado, staff_que_reviso, motivo_rechazo, notas, mensaje_id |
-| `UniformesAprobados` | user_id, personaje, link_imagen, fecha, staff_que_reviso, estado |
-| `EstudiantesPendientes` | user_id, username, personaje, club, elemento, imagen, fecha, staff_que_reviso, motivo, link_ficha_final, estado, notas, generacion, mensaje_id |
-| `EstudiantesAprobados` | user_id, username, personaje, elemento, club, link_ficha, fecha, staff_que_reviso, generacion, especie, casa |
-| `Profesores` | user_id, username, personaje, materia, subcargo, link_ficha, fecha, staff_que_reviso, estado, generacion |
-| `Trabajadores` | user_id, username, personaje, cargo, subcargo, link_ficha, fecha, staff_que_reviso, estado, generacion |
-| `TrabajosPendientes` | user_id, username, personaje, cargo, subcargo, materia, notas, fecha, estado, staff_que_reviso, motivo, link_ficha_final, generacion, mensaje_id |
-| `GlobalStats` | categoria, valor |
-| `PuntosPC` | user_id, username, personaje, pc_total, pc_disponible, fecha_actualizacion |
-| `HistorialPC` | user_id, personaje, pc_otorgados, motivo, asignado_por, fecha |
-| `Sanciones` | user_id, username, personaje, tipo, duracion, estado, asignado_por, fecha, motivo |
-| `FichasPoder` | user_id, username, personaje, categoria_raza, nivel_poder, mana, habilidades, debilidades, estado, staff_que_reviso, fecha, motivo_rechazo, denegaciones |
-| `HistorialSpins` | user_id, personaje, nivel_poder, mana, fecha |
-| `HistorialBatallas` | user_id, personaje, rival_user_id, rival_personaje, resultado, fecha |
-| `CodigosID` | user_id, personaje, tipo, codigo, foto_url, fecha |
-
-**For the `GlobalStats` sheet**, add these values in column A (column B will be auto-filled by the bot):
-
-```
-estudiantes_total
-trabajadores_total
-profesores_total
-uniformes_aprobados
-fichas_aprobadas
-trabajos_aprobados
-pendientes_totales
-uniformes_pendientes
-fichas_pendientes
-trabajos_pendientes
-```
+Copy the generated URL and use it to invite the bot.
 
 ---
 
-### STEP 6 — Configure environment variables
+## 📊 Setting up Google Sheets
 
-Copy `.env.example` to `.env` and fill in all values:
+### 1. Create the spreadsheet
 
-```bash
-cp .env.example .env
-```
+Create a new spreadsheet at [sheets.google.com](https://sheets.google.com). Create exactly **15 tabs** with these exact names (case-sensitive):
 
-Then edit `.env`:
+| # | Tab Name | Description |
+|---|----------|-------------|
+| 1 | `UniformesPendientes` | Pending uniform requests |
+| 2 | `UniformesAprobados` | Approved uniforms |
+| 3 | `EstudiantesPendientes` | Pending student sheets |
+| 4 | `EstudiantesAprobados` | Approved students |
+| 5 | `Profesores` | Approved professors |
+| 6 | `Trabajadores` | Approved workers |
+| 7 | `TrabajosPendientes` | Pending work sheets |
+| 8 | `GlobalStats` | Server-wide statistics |
+| 9 | `PuntosPC` | Current conduct points per user |
+| 10 | `HistorialPC` | Full points history |
+| 11 | `Sanciones` | Active sanctions log |
+| 12 | `FichasPoder` | Approved power sheets |
+| 13 | `HistorialSpins` | Power spin history |
+| 14 | `HistorialBatallas` | Battle history |
+| 15 | `CodigosID` | Generated ID codes |
+
+### 2. Create a Google Service Account
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com)
+2. Create a new project (or use an existing one)
+3. Go to **APIs & Services → Library**
+4. Enable **Google Sheets API** and **Google Drive API**
+5. Go to **Credentials → Create Credentials → Service Account**
+6. Give it a name, continue, and download the JSON credentials file
+7. Save this file as `credentials.json` in the project root
+
+### 3. Share the sheet with the service account
+
+Open `credentials.json` and find the `client_email` field (something like `bot@project.iam.gserviceaccount.com`).
+
+Share your Google Sheet with that email address, giving it **Editor** permissions.
+
+---
+
+## 🔑 Environment variables
+
+Create a `.env` file in the project root:
 
 ```env
-# ── DISCORD ──────────────────────────────────
-DISCORD_TOKEN=your_bot_token_here
-GUILD_ID=your_server_id_here
+# Discord bot token
+DISCORD_TOKEN=your_token_here
 
-# ── GOOGLE SHEETS ────────────────────────────
-GOOGLE_SHEETS_ID=your_spreadsheet_id_here
+# Discord server ID (right-click server → Copy Server ID)
+GUILD_ID=123456789012345678
 
-# ── CHANNELS ─────────────────────────────────
-CANAL_ENVIAR_UNIFORME=channel_id
-CANAL_REGISTRAR_ESTUDIANTE=channel_id
-CANAL_REGISTRO_TRABAJOS=channel_id
-CANAL_CARTA_ACEPTACION=channel_id
-CANAL_FICHAS_ESTUDIANTES=channel_id
-CANAL_FICHAS_PROFESORES=channel_id
-CANAL_FICHAS_TRABAJADORES=channel_id
-CANAL_REVISION_UNIFORMES=channel_id
-CANAL_REVISION_FICHAS=channel_id
-CANAL_LOGS_BOT=channel_id
-CANAL_SANCIONES=channel_id
+# Channel IDs (right-click channel → Copy ID)
+CANAL_REVISION_FICHAS=123456789012345678
+CANAL_REVISION_PODER=123456789012345678
+CANAL_REGISTRO_TRABAJOS=123456789012345678
+CANAL_REGISTRO_ESTUDIANTES=123456789012345678
+CANAL_REGISTRO_PODERES=123456789012345678
 
-# ── ROLES ────────────────────────────────────
-ROL_STAFF=role_id
-ROL_ESTUDIANTE=role_id
-ROL_PROFESOR=role_id
-ROL_TRABAJADOR=role_id
+# Role IDs
+ROL_REGISTRADO=123456789012345678
+ROL_CONSEJO=123456789012345678
+ROL_SLOT_ADICIONAL=123456789012345678
+ROL_RESPIN=123456789012345678
 
-# ── GENERATION ───────────────────────────────
+# Google Sheets URL (from your browser)
+SPREADSHEET_URL=https://docs.google.com/spreadsheets/d/YOUR_ID_HERE/edit
+
+# Current server generation (for slot tracking)
 GENERACION_ACTUAL=1
 ```
 
 **How to get Discord IDs:**
-1. Enable Developer Mode: Discord Settings → Advanced → Developer Mode ✅
-2. Right-click any channel/role/server → **Copy ID**
+- Enable **Developer Mode** in Discord Settings → Advanced → Developer Mode
+- Right-click any server, channel, or role to see "Copy ID"
 
 ---
 
-### STEP 7 — Configure the bot for your server
+## 🎨 Customizing the bot
 
-Open `utils/constants.py` and customize these sections:
+### Edit `utils/constants.py`
+
+This is the main configuration file. Change these values for your server:
 
 ```python
-# ── HOUSES ── Change names and count here
+# Your server ID
+GUILD_ID = int(os.getenv("GUILD_ID", "YOUR_GUILD_ID"))
+
+# Houses / factions in your server
 CASAS = ["House1", "House2", "House3", "House4"]
 
-# ── POSITIONS ── Edit names and slot limits
-CARGOS = {
-    "Librarian": 2,
-    "Secretary": 2,
-    # ... add or remove as needed
+# Available subjects for professors
+MATERIAS = ["Subject 1", "Subject 2", "Subject 3"]
+
+# Max slots per subject (how many professors per subject per generation)
+MATERIAS_LIMITE = {
+    "Subject 1": 2,
+    "Subject 2": 2,
+    "Subject 3": 1,
 }
 
-# ── SUBJECTS ── Edit for your server's curriculum
-MATERIAS = [
-    "Subject 1",
-    "Subject 2",
-    # ...
-]
+# Available positions for workers
+CARGOS = ["Position 1", "Position 2", "Position 3"]
 
-# ── CLUBS ── Map club names to Discord role IDs
-CLUBES = {
-    "Club Name": role_id_here,
-    # ...
+# Max slots per position
+CARGOS_LIMITE = {
+    "Position 1": 3,
+    "Position 2": 2,
 }
 
-# ── SPECIAL ROLES ──
-ROL_SLOT_ADICIONAL = role_id  # Role given when buying extra slot from store
-ROL_REGISTRADO     = role_id  # Role assigned to all approved characters
-ROL_CONSEJO        = role_id  # Council role (can assign direct PC)
+# Available clubs for students
+CLUBES = ["Club 1", "Club 2", "Club 3"]
+
+# Base character slots per user per generation
+SLOTS_BASE = {
+    "estudiantes": 2,
+    "trabajadores": 1,
+    "profesores": 1,
+}
 ```
 
 ---
 
-### STEP 8 — Run the bot locally
+## 🌐 Deployment
 
-```bash
-# Make sure your virtual environment is active
-python bot.py
-```
+### Option A: Railway (recommended)
 
-Expected output:
-```
-✅ Cog cargado: cogs.admin
-✅ Cog cargado: cogs.uniformes
-...
-✅ Bot conectado como YourBot#1234 (ID: 123456789)
-✅ Base de datos SQLite lista
-✅ 31 comando(s) sincronizados
-[SHEETS] ✅ Conectado a Google Sheets
-```
+1. Push the code to a GitHub repository
+2. Go to [railway.app](https://railway.app) → **New Project → Deploy from GitHub repo**
+3. Select your repository
+4. Go to the **Variables** tab and add all variables from your `.env`
+5. For Google credentials, you can paste the JSON content as a variable:
+   ```
+   GOOGLE_CREDENTIALS_JSON={"type":"service_account",...}
+   ```
+   Then adapt `utils/sheets.py` to read from this variable.
+6. Railway will auto-detect the `Procfile`:
+   ```
+   worker: python bot.py
+   ```
+7. Create `.python-version` with content `3.11.9` to pin the Python version.
 
----
+**⚠️ Important with Railway:**
+- The SQLite file **does persist** between deploys (stored at `/app/data/`)
+- When changing generation, update the `GENERACION_ACTUAL` variable in Railway
+- The `credentials.json` file **does NOT persist** between deploys — use the JSON env variable
 
-## 🚀 Deploy to Railway (Recommended — Free)
+### Option B: Render
 
-Railway keeps your bot running 24/7 for free.
-
-1. Go to https://railway.app and create an account
-2. Click **New Project → Deploy from GitHub repo**
-3. Connect your GitHub account and select your repository
-4. Railway will auto-detect Python and use `Procfile`
-5. Go to your project → **Variables** tab → add all variables from your `.env`:
-   - `DISCORD_TOKEN`
-   - `GUILD_ID`
-   - `GOOGLE_SHEETS_ID`
-   - All channel and role IDs
-   - `GENERACION_ACTUAL=1`
-6. Railway will automatically redeploy on every `git push`
-
-> **Important:** The `credentials.json` file must be in your repository's `data/` folder. Make sure it's committed to git (but keep your repo **private** if it contains credentials).
-
-> **Generation changes:** When you advance to the next generation using `/generacion cambiar`, remember to also update `GENERACION_ACTUAL` in Railway's Variables panel so it persists between deploys.
-
----
-
-## 🌐 Deploy to Render (Alternative — Free)
-
-1. Go to https://render.com and create an account
-2. Click **New → Web Service**
-3. Connect your GitHub repository
+1. Push the code to GitHub
+2. Go to [render.com](https://render.com) → **New → Background Worker**
+3. Connect your repository
 4. Configure:
-   - **Environment:** Python
+   - **Environment:** Python 3
    - **Build Command:** `pip install -r requirements.txt`
    - **Start Command:** `python bot.py`
-5. Add all environment variables in the **Environment** tab
-6. Click **Deploy**
-
-> **Note:** Render's free tier spins down after 15 minutes of inactivity. For a Discord bot that needs to stay online, use Railway or upgrade to a paid Render plan.
+5. Add environment variables in the **Environment** section
 
 ---
 
-## 📁 Project Structure
+## 📂 Project structure
 
 ```
-arcana-bot/
-├── bot.py                  # Main entry point
-├── Procfile                # Railway/Render start command
-├── requirements.txt        # Python dependencies
-├── .python-version         # Python version pin (3.11.9)
-├── .env.example            # Environment variables template
-├── .gitignore
-├── data/
-│   ├── credentials.json    # Google service account (keep private!)
-│   └── isefora.db          # SQLite database (auto-created)
-├── cogs/
-│   ├── admin.py            # Admin commands + stats panel
-│   ├── admin_data.py       # User data management
-│   ├── uniformes.py        # Uniform registration
+arcanabot/
+├── bot.py                  # Main entry point, cog loading
+├── .env                    # Environment variables (do NOT commit)
+├── .env.example            # Variable template
+├── credentials.json        # Google credentials (do NOT commit)
+├── .python-version         # Pins Python 3.11.9 for Railway
+├── requirements.txt        # Dependencies
+├── Procfile                # Railway start command
+├── .gitignore              # Protects sensitive files
+│
+├── cogs/                   # Bot modules (commands)
+│   ├── admin.py            # Admin commands
+│   ├── admin_data.py       # Character data management
+│   ├── uniformes.py        # Uniform system
 │   ├── estudiantes.py      # Student registration
 │   ├── profesores.py       # Professor registration
 │   ├── trabajos.py         # Worker registration
-│   ├── editar_ficha.py     # Character editing
-│   ├── pca.py              # Academic Points System
-│   ├── spins.py            # Power Spin + Battle system
+│   ├── editar_ficha.py     # Edit existing sheets
+│   ├── pca.py              # Conduct points system
+│   ├── spins.py            # Power & battle system
 │   ├── generar_id.py       # ID card generation
-│   └── ver_id.py           # ID card viewing
-└── utils/
-    ├── constants.py        # ⚙️ Main configuration file
-    ├── database.py         # SQLite operations
-    ├── sheets.py           # Google Sheets operations
-    ├── helpers.py          # Shared utilities
-    └── image_handler.py    # Image processing
+│   └── ver_id.py           # View ID cards
+│
+├── utils/                  # Utility modules
+│   ├── constants.py        # Main configuration
+│   ├── database.py         # SQLite operations
+│   ├── sheets.py           # Google Sheets integration
+│   └── helpers.py          # Helper functions and embeds
+│
+├── assets/                 # Visual resources
+│   ├── IDEstudiante.png    # Student ID card template
+│   └── IDWorker.png        # Worker ID card template
+│
+└── data/                   # Runtime-generated data
+    ├── isefora.db          # SQLite database
+    └── generacion.json     # Current generation (local backup)
 ```
 
 ---
 
-## ⚠️ Common Errors
+## 🧾 Command reference
 
-| Error | Solution |
-|---|---|
-| `ModuleNotFoundError: audioop` | You're using Python 3.13. Switch to Python 3.11 |
-| `ModuleNotFoundError` (other) | Activate virtual environment and run `pip install -r requirements.txt` |
-| `discord.errors.LoginFailure` | Wrong token in `.env` or Railway variables |
-| `SpreadsheetNotFound` | Wrong Sheets ID or not shared with service account email |
-| `KeyError: 0` in GUILD_ID | GUILD_ID is empty in `.env` |
-| Commands not appearing | Wait 1-2 minutes after deploy — Discord takes time to sync |
-| Slots showing wrong gen data | Update `GENERACION_ACTUAL` in Railway variables after changing generation |
+### Character registration
+| Command | Description |
+|---------|-------------|
+| `/uniforme` | Request uniform approval |
+| `/estudiante` | Register student sheet |
+| `/profesor` | Register professor sheet |
+| `/trabajo` | Register worker sheet |
+| `/editar-ficha` | Edit an existing sheet |
+
+### Power system
+| Command | Description |
+|---------|-------------|
+| `/poder` | Spin for a power (requires sheet photo) |
+| `/respin` | Re-spin (requires special role) |
+| `/iniciar-batalla` | Start a duel with another user |
+
+### ID cards
+| Command | Description |
+|---------|-------------|
+| `/generar-id` | Generate visual ID card |
+| `/ver-id` | View a previously generated ID |
+
+### Conduct points (PCA)
+| Command | Description |
+|---------|-------------|
+| `/asignar-pc` | Assign positive or negative points |
+| `/sancionar` | Create a formal sanction |
+| `/redimir-sancion` | Approve a sanction redemption |
+| `/apelar` | Appeal a sanction |
+| `/ver-sanciones` | View a user's active sanctions |
+| `/historial-pc` | View a user's points history |
+
+### Administration (staff only)
+| Command | Description |
+|---------|-------------|
+| `/admin` | Control panel (stats, slots, generation) |
+| `/admin-data ver` | View all characters of a user |
+| `/admin-data eliminar-personaje` | Delete a specific character |
+| `/admin-data eliminar-tipo` | Delete all characters of a type |
+| `/admin-data reset-slots` | Reset a user's slots |
+| `/admin-data reset-total` | Fully reset a user's data |
 
 ---
 
-## 🗄️ Database
+## 🐛 Common errors
 
-The bot uses **SQLite** for slot tracking (`data/isefora.db`). This file is created automatically on first run.
-
-> **Scaling note:** SQLite works well for servers up to ~500 active users. Beyond that, consider migrating to **PostgreSQL** (Railway offers a free PostgreSQL addon). The migration would require updating `utils/database.py` to use `asyncpg` instead of `aiosqlite`, and updating the connection string from a file path to a database URL.
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `ModuleNotFoundError: audioop` | Python 3.12+ incompatible | Use exactly Python 3.11; add `.python-version` with `3.11.9` |
+| `Forbidden: 403` on sync | Bot missing `applications.commands` scope | Re-invite the bot with the correct scope |
+| `gspread.exceptions.SpreadsheetNotFound` | Wrong URL or missing permissions | Check URL in `.env` and confirm sheet is shared with the service account |
+| `discord.errors.InteractionTimedOut` | Interaction not responded to within 3s | Add `await interaction.response.defer()` at the start of slow callbacks |
+| `Extension has no 'setup' function` | Missing `async def setup(bot)` in cog | Add it at the end of every cog file |
+| Slots showing wrong generation data | Outdated `GENERACION_ACTUAL` variable | Update the environment variable in Railway/Render |
 
 ---
 
-## 🔄 Every Session (Local)
+## 🔒 Security
 
-```bash
-# 1. Activate virtual environment
-venv\Scripts\activate    # Windows
-source venv/bin/activate # Mac/Linux
-
-# 2. Run the bot
-python bot.py
-```
+- **Never commit** `.env` or `credentials.json` to Git
+- Add both to `.gitignore`
+- If your Discord token leaks, **regenerate it immediately** in the developer portal
+- Leaked tokens can be used to spam, delete server content, or mass-ban users
 
 ---
 
 ## 📄 License
 
-This project is licensed under the **MIT License** — see [LICENSE](LICENSE) for details.
+[CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) — Free to use, modify and share. **Commercial use and resale are not permitted.** Credit to the original author is required.
 
-You are free to use, modify, and distribute this bot for your own server. Credit appreciated but not required.
+See the [LICENSE](LICENSE) file for full details.
 
 ---
 
-*ArcanaBot — Made with ❤️ for the RP community*
+Built with ❤️ by **Devilishh** · Need technical support? Contact `devilishh.` on Discord

@@ -1,344 +1,656 @@
-# 🔮 ArcanaBot — Architecture & Feature Reference
+# 🏗️ ArcanaBot Architecture — Technical Reference
 
-> This document describes the complete technical architecture, all implemented features, and the data model of ArcanaBot. Use this as a reference when extending or maintaining the bot.
-
----
-
-## 🏗️ Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Language | Python 3.11 |
-| Discord library | discord.py 2.4.0 |
-| Local storage | SQLite (aiosqlite) |
-| Remote storage | Google Sheets (gspread) |
-| Auth | google-auth (Service Account) |
-| Config | python-dotenv |
-| Hosting | Railway (recommended) / Render |
+This document is the complete technical reference for developers who want to extend, modify or understand the bot's internal workings.
 
 ---
 
-## 📁 Architecture Overview
+## 🧱 Tech stack
+
+| Component | Technology | Version | Notes |
+|-----------|-----------|---------|-------|
+| Language | Python | 3.11 exactly | 3.12+ removes `audioop` |
+| Discord framework | discord.py | 2.4.0 | Slash commands, Views, Modals |
+| Local database | SQLite (aiosqlite) | 0.20.0 | Async slot tracking |
+| Spreadsheet | gspread + google-auth | 6.0.2 / 2.27.0 | Sheet storage and stats |
+| Image generation | Pillow (PIL) | Latest | ID card generation |
+| Environment vars | python-dotenv | 1.0.0 | Local configuration |
+| Hosting | Railway / Render | — | Cloud hosting |
+
+---
+
+## 📐 Architecture overview
 
 ```
-┌─────────────────────────────────────────────────┐
-│                   Discord Server                 │
-│  Users → Slash Commands → Bot → Views/Modals    │
-└───────────────────┬─────────────────────────────┘
-                    │
-┌───────────────────▼─────────────────────────────┐
-│                  bot.py (entry)                  │
-│  - Loads all cogs                               │
-│  - Registers slash commands per guild           │
-│  - Handles on_message for image capture         │
-│  - Persists pending review views on restart     │
-└───────┬───────────────────────┬─────────────────┘
-        │                       │
-┌───────▼───────┐     ┌─────────▼──────────┐
-│  cogs/ (12)   │     │  utils/ (5)         │
-│  Commands &   │     │  Shared services    │
-│  UI Views     │     │  & helpers          │
-└───────┬───────┘     └─────────┬──────────┘
-        │                       │
-        └──────────┬────────────┘
-                   │
-    ┌──────────────▼──────────────┐
-    │   Data Layer                │
-    │   SQLite (slots)            │
-    │   Google Sheets (all data)  │
-    └─────────────────────────────┘
+Discord ←──→ bot.py (Entry point)
+                ├── 11 Cogs (cogs/)
+                │     └── Slash commands, Views, Modals, Selects
+                ├── utils/constants.py   ← Centralized configuration
+                ├── utils/database.py    ← Async SQLite (slots)
+                ├── utils/sheets.py      ← Google Sheets (sheets, stats)
+                └── utils/helpers.py     ← Embeds, formatting, publishing
+```
+
+**Typical interaction flow:**
+
+1. User runs a slash command
+2. The corresponding cog shows a Modal or View
+3. User fills in the form → callback receives the data
+4. Data is validated and saved to Sheets (pending)
+5. Staff reviews and approves/rejects in the review channel
+6. On approval: Sheets updated, role assigned, user notified
+
+---
+
+## 📦 Modules (Cogs)
+
+### `bot.py` — Main entry point
+
+- Loads all 11 cogs on startup
+- `on_ready` event: syncs guild slash commands
+- `on_message` event: captures images sent by users (for pending sheet profile photos)
+- Sync strategy: **guild-only** (global commands can take up to 1 hour to propagate)
+
+```python
+# Cogs loaded on startup
+EXTENSIONS = [
+    "cogs.admin", "cogs.admin_data",
+    "cogs.uniformes", "cogs.estudiantes",
+    "cogs.profesores", "cogs.trabajos",
+    "cogs.editar_ficha", "cogs.pca",
+    "cogs.spins", "cogs.generar_id", "cogs.ver_id"
+]
 ```
 
 ---
 
-## 🧩 Cogs Reference
+### `cogs/uniformes.py` — Uniform system
 
-### `cogs/admin.py`
-Main admin cog. Contains:
-- `/reclamar-slot` — activates extra character slot from store role
-- `/mis-personajes` — shows slot usage and character list with navigation
-- `/ver-personajes @user` — staff view of any user's characters
-- `/eliminar-personaje` — request to delete a character (staff approval required)
-- `/admin-stats` — 5-section interactive stats panel
-- `/panel-uniformes` — mass uniform review with navigation
-- `/generacion ver/cambiar/historial` — generation management
-- `cargar_generacion()` — reads from `GENERACION_ACTUAL` env var → fallback to JSON file → fallback to 1
-- `guardar_generacion()` — saves to local JSON (reminder to update Railway var manually)
-- `AdminStatsView` — 5-tab interactive panel (General, Moderation, PCA, Spins, Battles)
-- All UI views for character deletion, uniform panel, generation confirmation
+**Command:** `/uniforme`
 
-### `cogs/admin_data.py`
-Data management for staff:
-- `/admin-data ver @user` — shows all registered data for a user
-- `/admin-data eliminar-personaje @user name` — deletes one specific character
-- `/admin-data eliminar-tipo @user type` — deletes all characters of a type (student/professor/worker/uniform)
-- `/admin-data reset-slots @user` — resets only SQLite slot counters to 0
-- `/admin-data reset-total @user` — full reset (all characters + uniforms + slots) — irreversible
+**Flow:**
+```
+/uniforme
+  → UniformeModal (name, last name, age, reference link)
+  → CasaSelectView (house/faction selector)
+  → VersionSelectView (Diplomatic / Militarized)
+  → Send to review channel (embed with Approve/Reject buttons)
+  → Staff approves → moved to UniformesAprobados in Sheets
+```
 
-### `cogs/uniformes.py`
-Uniform registration flow:
-1. `/uniforme` → `UniformeModal` (character name)
-2. `CasaSelectView` → house selection
-3. `VersionSelectView` → uniform version (Diplomatic / Militarized)
-4. Image sent in channel → captured by `bot.py` `on_message`
-5. Review embed sent to staff channel → `UniformeReviewView` (Approve/Reject)
-
-### `cogs/estudiantes.py`
-Student registration (3 modals + selectors):
-1. `/ficha-estudiante` → checks uniform approved + slot available
-2. Modal 1: name, age (max 18), pronouns, species, element
-3. House selector
-4. Modal 2: powers, weaknesses, personality, history
-5. Modal 3: hobbies, likes, dislikes
-6. Club selector (multiple choice, maps to Discord roles)
-7. Image in channel
-8. Staff review → `EstudianteReviewView` → on approve: roles assigned, acceptance letter sent, card published in 2 messages, ID generated
-
-### `cogs/profesores.py`
-Professor registration:
-1. `/ficha-profesor` → subject selector (25 subjects + substitute button)
-2. Modal 1: name, age (min 25), pronouns, species, element
-3. Modal 2: powers, weaknesses, personality, history
-4. Modal 3: hobbies, likes, dislikes
-5. Image in channel
-6. Staff review → on approve: professor role assigned, card published
-
-### `cogs/trabajos.py`
-Worker registration:
-1. `/ficha-trabajador` → position selector (checks quota)
-2. Modal 1: name, age (min 25), pronouns, species, element
-3. Modal 2: powers, weaknesses, personality, history
-4. Modal 3: hobbies, likes, dislikes
-5. Image in channel
-6. Staff review → on approve: worker role assigned, card published
-
-### `cogs/editar_ficha.py`
-Character editing:
-- `/editar-ficha [name]` — opens pre-filled modals with current data
-- Supports students, professors, and workers
-- Changes go through staff review before publishing
-
-### `cogs/pca.py`
-Academic Points System (full moderaton subsystem):
-- `/asignar-pc-nota @user grade reason` — assigns PC by academic grade
-- `/asignar-pc-directo @user pc reason` — direct PC assignment (Council only)
-- `/aplicar-sancion @user type reason` — applies sanction
-- `/marcar-sancion-cumplida @user` — marks sanction as fulfilled
-- `/limpiar-sanciones @user` — clears active sanctions
-- `/limpiar-pc mode [user]` — resets PC for one or all
-- `/ver-pc @user` — balance + active sanctions (character selector)
-- `/historial-pc @user` — full PC history (character selector)
-- `/canjear-pc` — redeem PC to reduce active sanction
-- `/apelar` — appeal suspension/expulsion (character owner only)
-- Automatic approval flow in `CANAL_APROBACIONES` for suspensions, expulsions, professor detentions
-- 4-rejection protocol: auto-mentions staff for personal assistance
-
-### `cogs/spins.py`
-Power Spin + Battle System:
-- `/spin-poder` — generates level (low/medium/high) and mana (0-10)
-- Power sheet modal (abilities + weaknesses)
-- Staff review → category assignment (secret, 7 tiers) → DM with full info on approval
-- `/editar-ficha-poder [name]` — edit approved power sheet (abilities/weaknesses only, stats preserved)
-- `/respin-personaje` — full re-roll (requires store role `ROL_RESPIN`)
-- `/ver-ficha-poder [name]` — public power sheet view with navigation
-- `/batalla @rival` — initiates battle, both users select characters
-- `BatallaActivaView` — ⚔️ Roll / 🏆 End / 🏳️ Cancel buttons
-- `SeleccionarGanadorView` — winner selection on battle end
-- `/historial-batalla [name]` — battle history per character
-
-### `cogs/generar_id.py`
-ID card generation:
-- Auto-triggered on character approval
-- `/generar-id` — manual generation
-- Fills image template with: photo, unique code, name, age, species, element, clubs, house, generation, join date, signature
-- Code format: `STU0001`, `PRF0001`, `WRK0001` (type + sequential number)
-
-### `cogs/ver_id.py`
-- `/ver-id [name]` — view any character's ID card
+**Sheets involved:** `UniformesPendientes`, `UniformesAprobados`
 
 ---
 
-## 🔧 Utils Reference
+### `cogs/estudiantes.py` — Student registration
+
+**Command:** `/estudiante`
+
+**Flow:**
+```
+/estudiante
+  → Slot availability check
+  → Modal 1: Basic info (name, last name, age, academic year)
+  → Modal 2: History and personality
+  → Modal 3: Appearance and photo
+  → CasaSelectView (house selector)
+  → ClubesSelectView (multi-select club picker)
+  → Profile photo capture (waits for user to send image)
+  → Send to review channel
+  → Staff approves → slot recorded in SQLite + Sheets
+```
+
+**Sheets involved:** `EstudiantesPendientes`, `EstudiantesAprobados`
+
+---
+
+### `cogs/profesores.py` — Professor registration
+
+**Command:** `/profesor`
+
+**Flow:**
+```
+/profesor
+  → MateriaSelectView (checks available slots per generation)
+  → Modal 1: Professor info
+  → Modal 2: History and experience
+  → Modal 3: Appearance and photo
+  → Send to review channel
+  → Staff approves → slot recorded in SQLite + Sheets
+```
+
+**Slot logic:** `get_profesores_aprobados_por_materia(materia)` filters by current generation. If `occupied >= limit`, the request is rejected.
+
+**Sheets involved:** `Profesores`, `TrabajosPendientes`
+
+---
+
+### `cogs/trabajos.py` — Worker registration
+
+**Command:** `/trabajo`
+
+**Flow:**
+```
+/trabajo
+  → CargoSelectView (checks available slots per generation)
+  → Modal 1: Worker info
+  → Modal 2: History and motivation
+  → Modal 3: Appearance and photo
+  → Send to review channel
+  → Staff approves → slot recorded in SQLite + Sheets
+```
+
+**Sheets involved:** `TrabajosPendientes`, `Trabajadores`
+
+---
+
+### `cogs/editar_ficha.py` — Sheet editing
+
+**Command:** `/editar-ficha`
+
+**Flow:**
+```
+/editar-ficha
+  → Type selector (Student / Professor / Worker)
+  → Character selector (list of user's sheets)
+  → Pre-filled modals with existing data
+  → Send to review channel (marked as "EDIT")
+  → Staff approves → updates the row in Sheets
+```
+
+---
+
+### `cogs/pca.py` — Academic Conduct Points
+
+**Commands:** `/asignar-pc`, `/sancionar`, `/redimir-sancion`, `/apelar`, `/ver-sanciones`, `/historial-pc`
+
+**PCA system structure:**
+
+| Action | Description |
+|--------|-------------|
+| Assign PC | Staff adds positive or negative points to a user |
+| Sanction | Staff registers a formal sanction (minor/major offense/expulsion) |
+| Appeal | User requests a sanction review |
+| Redeem | Staff approves a redemption process |
+
+**Sheets involved:** `PuntosPC`, `HistorialPC`, `Sanciones`
+
+**Appeal flow:**
+```
+User /apelar
+  → Modal with justification
+  → Sent to staff review channel
+  → Staff approves → sanction marked as "redeemed"
+  → User notified
+```
+
+---
+
+### `cogs/spins.py` — Power and battle system
+
+**Commands:** `/poder`, `/respin`, `/iniciar-batalla`
+
+**Power spin flow:**
+```
+/poder
+  → User provides photo of their character sheet
+  → Bot spins: selects weighted race category
+  → Within category: selects specific power
+  → Staff sees category (secret) + the power
+  → Staff approves → recorded in FichasPoder + HistorialSpins
+  → User receives embed with their power (category hidden)
+```
+
+**The 7 race categories (secret, staff-only):**
+
+| Emoji | Category | Weight (%) | Description |
+|-------|----------|-----------|-------------|
+| ⚪ | Básico (Basic) | 40% | Most common race |
+| 🔵 | Sensitivo (Sensitive) | 25% | Slightly uncommon |
+| 🟢 | Épico (Epic) | 15% | Infrequent |
+| 🟡 | Mítico (Mythic) | 10% | Rare |
+| 🟠 | Legendario (Legendary) | 6% | Very rare |
+| 🔴 | Maldito (Cursed) | 3% | Extremely rare |
+| ✨ | Divino (Divine) | 1% | Near impossible |
+
+Selection uses `random.choices()` with the weights defined in `CATEGORIAS_RAZA` inside `constants.py`.
+
+**Battle system flow:**
+```
+/iniciar-batalla @rival
+  → Bot verifies both users have approved power sheets
+  → Creates BatallaActivaView with buttons:
+     ⚔️ Roll      → generates random result for both
+     🏆 End       → winner selector → records in HistorialBatallas
+     🏳️ Cancel    → cancels the battle
+```
+
+**Sheets involved:** `FichasPoder`, `HistorialSpins`, `HistorialBatallas`
+
+---
+
+### `cogs/generar_id.py` — ID card generation
+
+**Command:** `/generar-id`
+
+**Process:**
+```
+/generar-id @user
+  → Looks up user data in Sheets (student or worker)
+  → Opens PNG template (assets/IDEstudiante.png or assets/IDWorker.png)
+  → Draws text over template with PIL/Pillow:
+     - Full name
+     - House / Position
+     - Academic year / Position description
+     - Unique ID code
+  → Downloads user's Discord profile photo
+  → Places it in the designated position on the template
+  → Saves result as temporary image
+  → Sends in the channel and records the code in CodigosID in Sheets
+```
+
+**Sheets involved:** `CodigosID`, `EstudiantesAprobados`, `Trabajadores`
+
+---
+
+### `cogs/ver_id.py` — View ID cards
+
+**Command:** `/ver-id`
+
+Looks up the user's registered ID in `CodigosID` and regenerates it from the saved photo URL.
+
+---
+
+### `cogs/admin.py` — Admin panel
+
+**Command:** `/admin` (staff with council role only)
+
+**AdminStatsView — 5 sections:**
+
+| Button | Description |
+|--------|-------------|
+| 📊 Statistics | Character totals, slot usage, global stats |
+| 👥 Users | Slot info for a specific user |
+| 🎓 Generation | Change the active server generation |
+| 🔄 Mass reset | Reset all slots (new generation) |
+| ❌ Close | Close the panel |
+
+**Generation logic:**
+
+`cargar_generacion()` reads in this priority order:
+1. Environment variable `GENERACION_ACTUAL` (persists on Railway)
+2. File `data/generacion.json` (local backup)
+3. Default value: `1`
+
+---
+
+### `cogs/admin_data.py` — Data management
+
+**Commands:**
+
+| Command | Description |
+|---------|-------------|
+| `/admin-data ver @user` | List all characters of a user |
+| `/admin-data eliminar-personaje @user` | Delete a specific character |
+| `/admin-data eliminar-tipo @user type` | Delete all characters of a type |
+| `/admin-data reset-slots @user` | Reset slot counters |
+| `/admin-data reset-total @user` | Delete all user data |
+
+---
+
+## 🔧 Utility modules
 
 ### `utils/constants.py`
-**The main configuration file.** All server-specific values live here:
-- `CASAS` — list of house names
-- `CARGOS` — dict of position name → max slots (None = 1)
-- `MATERIAS` — list of subject names
-- `MATERIAS_LIMITE` — dict of subject → max professors
-- `CLUBES` — dict of club name → Discord role ID
-- `SLOTS_CONFIG` — per-generation slot limits
-- `TABLA_NOTAS_PC` — grade-to-PC conversion table
-- `TIPOS_SANCION` — sanction type configurations
-- `CATEGORIAS_RAZA` — 7 race categories for power system (secret)
-- `NIVELES_PODER` — power level descriptions
-- `DESCRIPCIONES_MANA` — mana value descriptions
-- All channel/role ID constants loaded from env vars
+
+The bot's central configuration file. **Everything configurable lives here.**
+
+Key variables:
+
+```python
+# Server IDs
+GUILD_ID              # Discord server ID
+CANAL_REVISION_FICHAS # Channel where staff reviews sheets
+CANAL_REVISION_PODER  # Channel where staff reviews powers
+CANAL_REGISTRO_*      # Channels where approved sheets are published
+
+# Role IDs
+ROL_REGISTRADO        # Role assigned when a sheet is approved
+ROL_CONSEJO           # Staff role with access to admin commands
+ROL_SLOT_ADICIONAL    # Role that grants one extra character slot
+ROL_RESPIN            # Role that allows a power respin
+
+# Character configuration
+CASAS                 # List of available houses/factions
+MATERIAS              # List of subjects for professors
+MATERIAS_LIMITE       # Max slots per subject per generation
+CARGOS                # List of positions for workers
+CARGOS_LIMITE         # Max slots per position per generation
+CLUBES                # List of clubs for students
+SLOTS_BASE            # Base slots per character type
+
+# Power system (don't change weights without adjusting logic)
+CATEGORIAS_RAZA       # 7 categories with weighted probabilities
+NIVELES_PODER         # Power levels per category
+DESCRIPCIONES_MANA    # Mana type descriptions
+
+# Embed colors
+COLOR_OK              # Green (approved)
+COLOR_ERROR           # Red (rejected)
+COLOR_INFO            # Blue (info)
+COLOR_PENDIENTE       # Yellow (pending)
+```
+
+---
 
 ### `utils/database.py`
-SQLite operations via `aiosqlite`:
-- `init_db()` — creates `slots_usuarios` table if not exists
-- `get_conteo_usuario(user_id, generation)` — returns slot usage dict
-- `puede_registrar(user_id, type, generation, limit)` — checks if registration is allowed
-- `registrar_personaje(user_id, type, generation)` — increments slot counter
-- `restar_personaje(user_id, type, generation)` — decrements slot counter
-- `agregar_slot_extra(user_id, generation)` — adds extra slot
-- `usar_slot_extra(user_id, type, generation)` — uses extra slot
-- `reset_usuario(user_id, generation)` — resets all counters to 0
 
-**Table: `slots_usuarios`**
-```sql
-user_id                 INTEGER
-generacion              INTEGER
-estudiantes_usados      INTEGER DEFAULT 0
-trabajadores_usados     INTEGER DEFAULT 0
-profesores_usados       INTEGER DEFAULT 0
-slots_extra_disponibles INTEGER DEFAULT 0
-slots_extra_usados      INTEGER DEFAULT 0
-PRIMARY KEY (user_id, generacion)
+Async SQLite operations for character slot tracking.
+
+**Main functions:**
+
+```python
+async def init_db()
+# Creates tables if they don't exist
+
+async def get_conteo_usuario(user_id: int, generacion: int) -> dict
+# Returns how many characters of each type the user has in the current generation
+
+async def registrar_personaje(user_id: int, generacion: int, tipo: str)
+# Increments the counter for the given type ("estudiantes", "trabajadores", "profesores")
+
+async def reset_usuario(user_id: int, generacion: int)
+# Resets all counters for a user to 0
+
+async def agregar_slot_extra(user_id: int, generacion: int, cantidad: int)
+# Adds extra slots to the user (for the ROL_SLOT_ADICIONAL role)
+
+async def get_todos_los_usuarios(generacion: int) -> list
+# Returns all records for the current generation (for admin stats)
 ```
+
+**`slots_usuarios` table schema:**
+
+```sql
+CREATE TABLE IF NOT EXISTS slots_usuarios (
+    user_id              INTEGER NOT NULL,
+    generacion           INTEGER NOT NULL,
+    estudiantes_usados   INTEGER DEFAULT 0,
+    trabajadores_usados  INTEGER DEFAULT 0,
+    profesores_usados    INTEGER DEFAULT 0,
+    slots_extra_disponibles INTEGER DEFAULT 0,
+    slots_extra_usados   INTEGER DEFAULT 0,
+    PRIMARY KEY (user_id, generacion)
+)
+```
+
+---
 
 ### `utils/sheets.py`
-Google Sheets operations:
-- All CRUD operations for each sheet
-- `actualizar_global_stats()` — recalculates and updates GlobalStats sheet
-- `get_global_stats()` — reads GlobalStats
-- `get_personajes_usuario(user_id)` — returns all characters across sheets
-- `get_profesores_aprobados_por_materia(subject)` — filtered by current generation
-- `get_trabajadores_aprobados_por_cargo(position)` — filtered by current generation
-- `eliminar_personaje_sheets(user_id, name, type)` — removes from appropriate sheet
-- Approval/rejection functions for each character type
+
+Google Sheets integration for persistent storage of sheets and statistics.
+
+**Main functions:**
+
+```python
+def get_sheet(nombre: str) -> gspread.Worksheet
+# Gets a spreadsheet tab by name
+
+def agregar_fila(nombre_hoja: str, fila: list)
+# Appends a row to the end of the given sheet
+
+def get_todas_las_filas(nombre_hoja: str) -> list[dict]
+# Returns all rows as a list of dicts (uses first row as headers)
+
+def actualizar_fila(nombre_hoja: str, col_busqueda: str, val_busqueda: str, datos: dict)
+# Finds a row by value in a column and updates the given fields
+
+def get_personajes_usuario(user_id: int) -> list[dict]
+# Returns all approved characters for a user (searches all sheets)
+
+def get_profesores_aprobados_por_materia(materia: str, gen: int) -> int
+# Counts approved professors for a subject in the current generation
+
+def get_trabajadores_aprobados_por_cargo(cargo: str, gen: int) -> int
+# Counts approved workers for a position in the current generation
+```
+
+**⚠️ Note on Sheets rate limits:**
+
+The Google Sheets API has a limit of ~60 requests per minute. If the bot makes many operations in a short time, it may receive `APIError: RESOURCE_EXHAUSTED`. Solutions:
+- In-memory cache for data that doesn't change frequently
+- Batch read operations
+- `asyncio.sleep(1)` between bulk operations
+
+---
 
 ### `utils/helpers.py`
-- `is_valid_character_name(name)` — validates name (letters only, no numbers)
-- `clean_field(text)` — sanitizes text input
-- `build_review_embed(type, data)` — builds the staff review embed for any character type
-- `format_ficha_*()` — formats character sheets for public publication
 
-### `utils/image_handler.py`
-- `registrar_espera(user_id, type, channel_id, data)` — registers that bot is waiting for image
-- `get_espera(user_id)` — checks if there's a pending image wait
-- `limpiar_espera(user_id)` — clears pending wait
-- Used by `bot.py`'s `on_message` handler to capture images after form completion
+Helper functions for building embeds and publishing sheets.
 
----
+**Main functions:**
 
-## 🔄 Key Flows
+```python
+def build_review_embed(tipo: str, data: dict, user: discord.Member) -> discord.Embed
+# Builds the review embed for the staff channel
+# tipo: "uniforme" | "estudiante" | "profesor" | "trabajador" | "poder"
 
-### Character Registration Flow
-```
-User: /ficha-estudiante
-  → Check uniform approved
-  → Check slot available (SQLite)
-  → Modal 1 (data)
-  → House selector
-  → Modal 2 (powers/history)
-  → Modal 3 (personality)
-  → Club selector
-  → Wait for image (image_handler)
-User: [sends image in channel]
-  → bot.py on_message captures it
-  → Review embed sent to CANAL_REVISION_FICHAS
-Staff: [clicks Approve]
-  → Roles assigned (character type + Registered + clubs)
-  → Slot counter incremented (SQLite)
-  → Character saved to Sheets
-  → Card published in 2 messages
-  → Acceptance letter sent
-  → ID card auto-generated
+def build_acceptance_embed(tipo: str, data: dict) -> discord.Embed
+# Builds the confirmation embed sent to the user on approval
+
+async def publicar_ficha_con_imagenes(channel, embed, foto_url, foto_ficha_url)
+# Publishes the approved sheet in the registration channel in two messages:
+# Message 1: Embed with character data
+# Message 2: Images (profile photo + sheet photo)
+
+def format_pc_table(historial: list) -> str
+# Formats points history as a text table
+
+def calcular_puntos_totales(historial: list) -> int
+# Sums all points in a user's history
 ```
 
-### Image Capture Flow
-`bot.py` has a single `on_message` handler that:
-1. Checks if user has a pending image wait (`image_handler.get_espera`)
-2. Captures ALL attachments from the message (not just first)
-3. Routes to the appropriate processing function (`_procesar_uniforme`, `_procesar_ficha`, etc.)
-4. Clears the pending wait
+---
 
-### Generation System
-- Generation stored in Railway env var `GENERACION_ACTUAL`
-- `cargar_generacion()` priority: env var → JSON file → default 1
-- All slot checks use the current generation
-- Sheets data filtered by generation for quota checks
-- When advancing generation: use `/generacion cambiar` → also update Railway variable manually
+## 📊 Google Sheets data model
+
+### Character sheets
+
+Each character tab uses this column structure (adapted per type):
+
+**EstudiantesAprobados:**
+```
+user_id | generacion | nombre | apellido | edad | año_academico | casa |
+clubes | historia | personalidad | apariencia | foto_url | foto_ficha_url |
+fecha_aprobacion | aprobado_por
+```
+
+**Profesores:**
+```
+user_id | generacion | nombre | apellido | edad | materia |
+historia | experiencia | apariencia | foto_url | foto_ficha_url |
+fecha_aprobacion | aprobado_por
+```
+
+**Trabajadores:**
+```
+user_id | generacion | nombre | apellido | edad | cargo |
+historia | motivacion | apariencia | foto_url | foto_ficha_url |
+fecha_aprobacion | aprobado_por
+```
+
+### Power sheets (FichasPoder)
+```
+user_id | generacion | nombre_personaje | categoria_raza (secret) |
+poder | nivel | mana | fecha_aprobacion | aprobado_por
+```
+
+### PCA system
+
+**PuntosPC:**
+```
+user_id | nombre_usuario | puntos_totales | ultima_actualizacion
+```
+
+**HistorialPC:**
+```
+user_id | tipo (positivo/negativo) | cantidad | motivo |
+asignado_por | fecha
+```
+
+**Sanciones:**
+```
+id_sancion | user_id | tipo_falta | descripcion | estado |
+fecha_sancion | sancionado_por | fecha_resolucion
+```
+
+### Global statistics (GlobalStats)
+```
+generacion | total_estudiantes | total_profesores | total_trabajadores |
+total_uniformes | ultima_actualizacion
+```
 
 ---
 
-## 📊 Google Sheets Data Model
+## 🔑 Role reference
 
-All 16 sheets and their purposes:
-
-| Sheet | Purpose | Filtered by gen? |
-|---|---|---|
-| UniformesPendientes | Uniforms awaiting review | No |
-| UniformesAprobados | Approved uniforms (gate for students) | No |
-| EstudiantesPendientes | Student sheets awaiting review | No |
-| EstudiantesAprobados | Approved student sheets | No |
-| Profesores | Professor sheets with status | Yes (quota) |
-| Trabajadores | Worker sheets with status | Yes (quota) |
-| TrabajosPendientes | Prof/worker sheets awaiting review | No |
-| GlobalStats | Auto-updated server counters | No |
-| PuntosPC | PC balance per character | No |
-| HistorialPC | Full PC assignment history | No |
-| Sanciones | All sanctions with status | No |
-| FichasPoder | Power sheets with stats and status | No |
-| HistorialSpins | Log of all spins performed | No |
-| HistorialBatallas | Battle results per character | No |
-| CodigosID | Generated ID codes and photo URLs | No |
+| Role | Purpose | When assigned |
+|------|---------|--------------|
+| `ROL_REGISTRADO` | Indicates the user has at least one approved sheet | On first sheet approval |
+| `ROL_CONSEJO` | Staff access to admin and approval commands | Manually by admins |
+| `ROL_SLOT_ADICIONAL` | Grants 1 extra character slot | Manually by admins (reward/event) |
+| `ROL_RESPIN` | Allows a power respin | Manually by admins |
 
 ---
 
-## 🔐 Roles Used
+## 🌀 Generation system
 
-| Constant | Purpose |
-|---|---|
-| `ROL_STAFF` | Can use all admin commands |
-| `ROL_ESTUDIANTE` | Assigned on student approval |
-| `ROL_PROFESOR` | Assigned on professor approval |
-| `ROL_TRABAJADOR` | Assigned on worker approval |
-| `ROL_REGISTRADO` | Assigned to all approved characters |
-| `ROL_CONSEJO` | Can assign direct PC (Trabajo Sucio) |
-| `ROL_SLOT_ADICIONAL` | Store role → `/reclamar-slot` converts to slot |
-| `ROL_RESPIN` | Store role → enables `/respin-personaje` |
+A **generation** represents a "season" or "cycle" of the server. When changing generations:
 
----
+- Character slots reset
+- Previous cycle sheets remain in Sheets but don't count toward limits
+- Professor/worker slots reset (evaluated per generation)
 
-## 📈 Scaling Notes
+**How to change generations:**
 
-### Current limits
-- SQLite works well up to ~500 concurrent active users
-- Google Sheets API: 60 read requests/minute (shared across all operations)
-- Discord slash commands: registered per-guild (no global limit issues)
+1. Use `/admin` → "Generation" section → enter the new number
+2. Update the `GENERACION_ACTUAL` variable in Railway/Render
+3. The bot starts using the new generation immediately
 
-### When to migrate to PostgreSQL
-If your server exceeds ~500 active registered users, migrate `utils/database.py`:
-1. Add `asyncpg` to `requirements.txt`
-2. Replace `aiosqlite.connect(DB_PATH)` with `asyncpg.connect(DATABASE_URL)`
-3. Update SQL syntax (PostgreSQL uses `$1, $2` placeholders instead of `?`)
-4. Add `DATABASE_URL` to environment variables (Railway provides this automatically with their PostgreSQL addon)
+**Generation persistence:**
 
-### Google Sheets rate limiting
-If you hit 429 errors frequently:
-- Add exponential backoff to `utils/sheets.py` operations
-- Consider batching multiple cell updates into single API calls
-- For heavy read operations, implement a local cache with TTL
-
----
-
-## 🏷️ Race Categories (Power System — Staff Only)
-
-The 7 secret race categories assigned by staff on power sheet approval:
-
-| Key | Name | Description |
-|---|---|---|
-| `basico` | ⚪ Basic | Humans with magical spark, elemental sensitivity |
-| `sensitivo` | 🔵 Sensitive | Minor bloodline mages, passive supernatural gifts |
-| `epico` | 🟢 Epic | Mutants, hybrid species, altered-form magic |
-| `mitico` | 🟡 Mythic | Fantasy creatures: Goblins, Orcs, Elves, Fairies |
-| `legendario` | 🟠 Legendary | Mythological beings: Phoenix, Pegasus, Kraken, Kitsune |
-| `maldito` | 🔴 Cursed | Ghosts, Yokai, Demons, Vampires, divine curses |
-| `divino` | ✨ Divine | Gods, Angels, Blessed beings, Divine avatars |
+```python
+def cargar_generacion() -> int:
+    # 1. Read GENERACION_ACTUAL env var (persists on Railway)
+    gen_env = os.getenv("GENERACION_ACTUAL")
+    if gen_env and gen_env.isdigit():
+        return int(gen_env)
+    
+    # 2. Read data/generacion.json (local backup)
+    try:
+        with open("data/generacion.json") as f:
+            return json.load(f)["generacion"]
+    except:
+        pass
+    
+    # 3. Default value
+    return 1
+```
 
 ---
 
-*ArcanaBot Architecture Reference — Keep this document updated when adding new features*
+## 🔄 Approval flow (detailed)
+
+All sheet types follow the same review pattern:
+
+```
+1. User fills in the form
+2. Bot sends embed to review channel:
+   ┌──────────────────────────────┐
+   │  📋 New sheet: Student       │
+   │  User: @name                 │
+   │  Name: John Doe              │
+   │  House: House1               │
+   │  ...                         │
+   │  [✅ Approve] [❌ Reject]    │
+   └──────────────────────────────┘
+3. Staff clicks Approve or Reject
+4a. On Approve:
+    - Moves data from Pending → Approved in Sheets
+    - Records slot in SQLite
+    - Assigns ROL_REGISTRADO to the user
+    - Publishes sheet in registration channel (2 messages: embed + images)
+    - Sends DM to user with confirmation
+4b. On Reject:
+    - Modal requests rejection reason
+    - Deletes the row from Pending in Sheets
+    - Sends DM to user with the reason
+```
+
+---
+
+## 📈 Scalability and limitations
+
+| Aspect | Current limit | Solution if exceeded |
+|--------|--------------|---------------------|
+| Commands per guild | ~100 slash commands | Use command groups |
+| Sheets requests | ~60/minute | Add in-memory cache |
+| Concurrent users | No logical limit | discord.py's async handles it |
+| SQLite DB size | ~100MB practical | Migrate to PostgreSQL (same async API) |
+| Characters in Sheets | ~10,000 rows per tab | Archive old sheets to another tab |
+
+### Migrating SQLite to PostgreSQL
+
+If the server grows and the database becomes a bottleneck, migration is straightforward thanks to `aiosqlite`:
+
+1. Replace `aiosqlite` with `asyncpg` or `databases`
+2. Update the connection variable in `database.py`
+3. The rest of the code stays the same (same functions, same API)
+
+---
+
+## 🧩 Adding a new character type
+
+To add, for example, a "Guardian" type:
+
+1. **`utils/constants.py`**: Add `ROLES_GUARDIAN`, `GUARDIAN_LIMITE`
+2. **`cogs/guardianes.py`**: Create the cog following the structure of `profesores.py`
+3. **`utils/database.py`**: Add `guardianes_usados` column to `slots_usuarios`
+4. **`utils/sheets.py`**: Add functions for the new tab
+5. **Google Sheets**: Create `GuardianesPendientes` and `Guardianes` tabs
+6. **`bot.py`**: Add `"cogs.guardianes"` to the extensions list
+
+---
+
+## 🧩 Adding or removing houses
+
+In `utils/constants.py`:
+
+```python
+# Change this list
+CASAS = ["House1", "House2", "House3"]
+
+# If each house has a role:
+ROLES_CASAS = {
+    "House1": 123456789,
+    "House2": 987654321,
+    "House3": 111222333,
+}
+```
+
+The house selector in the cogs is built dynamically from `CASAS`, so you only need to update that list.
+
+---
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a branch for your feature: `git checkout -b feature/new-feature`
+3. Commit your changes: `git commit -m 'Add new feature'`
+4. Push to your fork: `git push origin feature/new-feature`
+5. Open a Pull Request
+
+Please follow the existing code style and document any new functions.
+
+---
+
+Built with ❤️ by **Devilishh** · Need technical support? Contact `devilishh.` on Discord  
+Licensed under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) — free to use, not for sale.
