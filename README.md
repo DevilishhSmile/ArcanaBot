@@ -2,7 +2,7 @@
 
 > Character management bot for themed roleplay servers.  
 > Originally developed for **Academia Arcana Isefora** — adaptable for any similar community.
-> > 🇪🇸 ¿No entiendes inglés? Puedes ver la guía completa en español aquí: [Guía de Instalación ESP](README_ES.md)
+> 🇪🇸 ¿No entiendes inglés? Puedes ver la guía completa en español aquí: [Guía de Instalación ESP](README_ES.md)
 
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 [![discord.py 2.4.0](https://img.shields.io/badge/discord.py-2.4.0-5865F2.svg)](https://discordpy.readthedocs.io/)
