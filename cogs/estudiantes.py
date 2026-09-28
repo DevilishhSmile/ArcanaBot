@@ -66,9 +66,15 @@ class EstudianteModal1(discord.ui.Modal, title="🎓 Ficha de Estudiante — Par
             "elemento": clean_field(self.elemento.value), "usar_slot_extra": False,
             "casa": "",
         })
-        await interaction.response.send_message(
-            "✅ **Parte 1 recibida.**\n\n🏠 Selecciona la **casa** de tu personaje:",
-            view=CasaSelectEstudianteView(interaction.user.id), ephemeral=True)
+        # Si no hay casas configuradas, saltar directo a la parte 2
+        if not CASAS:
+            await interaction.response.send_message(
+                "✅ **Parte 1 recibida.**\n\nPresiona para continuar con poderes y personalidad.",
+                view=ContinuarModal2View(interaction.user.id), ephemeral=True)
+        else:
+            await interaction.response.send_message(
+                "✅ **Parte 1 recibida.**\n\n🏠 Selecciona la **casa** de tu personaje:",
+                view=CasaSelectEstudianteView(interaction.user.id), ephemeral=True)
 
 
 # ── MODAL PARTE 2 — Poderes, personalidad e historia ──
@@ -170,10 +176,28 @@ class EstudianteModal3(discord.ui.Modal, title="🎓 Ficha de Estudiante — Par
         datos["_tipo"]          = "estudiante"
         _guardar_temp(interaction.client, self.user_id, datos)
 
-        # Ir al selector de clubes
-        await interaction.response.send_message(
-            "✅ **Parte 3 recibida.**\n\n🎭 Selecciona el/los club(es) de tu personaje.",
-            view=ClubesSelectView(self.user_id, self.canal_id), ephemeral=True)
+        # Si no hay clubes configurados, saltar directo a la imagen
+        if not CLUBES:
+            datos["clubes_nombres"] = []
+            datos["clubes_ids"]     = []
+            _guardar_temp(interaction.client, self.user_id, datos)
+            registrar_espera(interaction.user.id, "estudiante", self.canal_id, datos)
+            await interaction.response.edit_message(
+                content=(
+                    "✅ **Parte 3 recibida.**\n\n"
+                    "📎 Último paso — **envía la(s) imagen(es) de tu personaje en este canal**.\n"
+                    "Pégala 📋 o adjúntala desde tu galería 🖼️\n\n"
+                    "🪪 **La primera imagen que adjuntes** será usada automáticamente "
+                    "para generar tu **ID de estudiante** al ser aprobado.\n"
+                    "Las demás también aparecerán en tu ficha con normalidad.\n\n"
+                    "*Escribe `sin imagen` si no tienes una.*"
+                ),
+                view=None)
+        else:
+            # Ir al selector de clubes
+            await interaction.response.send_message(
+                "✅ **Parte 3 recibida.**\n\n🎭 Selecciona el/los club(es) de tu personaje.",
+                view=ClubesSelectView(self.user_id, self.canal_id), ephemeral=True)
 
 
 # ── SELECT CLUBES ─────────────────────────────

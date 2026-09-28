@@ -37,7 +37,8 @@ COLOR_TEXTO = (130, 80, 50)
 COLOR_BARRA = (220, 185, 150)
 
 # Número real del servidor para mostrar en el ID
-GEN_SERVIDOR = GENERACION_ACTUAL + 3  # Gen 1 bot = Gen 4 servidor
+# Gen del bot = Gen del servidor (sin offset)
+GEN_SERVIDOR = GENERACION_ACTUAL
 
 
 # ──────────────────────────────────────────────
@@ -277,7 +278,7 @@ def _generar_id_imagen(data: dict, foto: Image.Image | None) -> io.BytesIO:
             print(f"[ID] Error pegando foto: {e}")
 
     # ── Escribir campos de texto ──────────────────
-    gen_real = GEN_SERVIDOR + (data.get("generacion", 1) - 1)
+    gen_real = GEN_SERVIDOR
 
     textos = [
         ("nombre",        data.get("personaje", "—"),          font_regular, COLOR_TEXTO),

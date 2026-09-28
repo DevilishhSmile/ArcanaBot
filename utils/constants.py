@@ -50,8 +50,10 @@ COLOR_ACEPTACION = 0x9B59B6
 
 # =============================================
 # CASAS — EDITAR AQUÍ si cambian
-# Solo los estudiantes eligen casa al registrarse
-# basándose en el cuestionario de personalidad
+# Solo los estudiantes eligen casa al registrarse.
+# Si tu servidor NO usa casas, deja la lista vacía: CASAS = []
+# → el selector de casa se omite automáticamente en todos los flujos.
+# Si tu servidor SÍ usa casas, pon los nombres aquí:
 # =============================================
 CASAS = ["Redmeadow", "Ledacrealis", "Ravyelle", "Azorya"]
 
@@ -94,6 +96,9 @@ MATERIAS_LIMITE["Profesor sustituto"] = 3
 
 # =============================================
 # CLUBES — EDITAR AQUÍ
+# Si tu servidor NO usa clubes, deja el dict vacío: CLUBES = {}
+# → el selector de clubes se omite automáticamente en el registro de estudiantes.
+# Formato: "Nombre del club": ID_del_rol_en_Discord
 # =============================================
 CLUBES = {
     "Danza":      1181462496096297020,

@@ -36,15 +36,27 @@ class UniformeModal(discord.ui.Modal, title="👕 Registro de Uniforme"):
             "username":  str(interaction.user),
         }
 
-        await interaction.response.send_message(
-            f"✅ Nombre registrado: **{clean_field(nombre)}**\n\n"
-            f"🏠 Ahora selecciona la **casa** a la que pertenece este personaje:",
-            view=CasaSelectView(
-                user_id=interaction.user.id,
-                canal_id=interaction.channel_id,
-            ),
-            ephemeral=True,
-        )
+        # Si no hay casas configuradas, saltar directo a la versión del uniforme
+        if not CASAS:
+            await interaction.response.send_message(
+                f"✅ Nombre registrado: **{clean_field(nombre)}**\n\n"
+                f"👔 Selecciona la **versión del uniforme**:",
+                view=VersionSelectView(
+                    user_id=interaction.user.id,
+                    canal_id=interaction.channel_id,
+                ),
+                ephemeral=True,
+            )
+        else:
+            await interaction.response.send_message(
+                f"✅ Nombre registrado: **{clean_field(nombre)}**\n\n"
+                f"🏠 Ahora selecciona la **casa** a la que pertenece este personaje:",
+                view=CasaSelectView(
+                    user_id=interaction.user.id,
+                    canal_id=interaction.channel_id,
+                ),
+                ephemeral=True,
+            )
 
 
 # ── SELECTOR DE CASA ──────────────────────────
