@@ -389,6 +389,11 @@ arcanabot/
 | `/admin-data reset-slots` | Reiniciar slots de un usuario |
 | `/admin-data reset-total` | Reiniciar completamente los datos de un usuario |
 
+### General
+| Comando | Descripción |
+|---------|-------------|
+| `/about-bot` | Muestra info del bot, funciones, versión y créditos |
+
 ---
 
 ## 🐛 Solución de errores comunes

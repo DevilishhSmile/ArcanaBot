@@ -369,6 +369,11 @@ arcanabot/
 | `/admin-data reset-slots` | Reset a user's slots |
 | `/admin-data reset-total` | Fully reset a user's data |
 
+### General
+| Command | Description |
+|---------|-------------|
+| `/about-bot` | Show bot info, features, version and credits |
+
 ---
 
 ## 🐛 Common errors
