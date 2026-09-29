@@ -416,6 +416,18 @@ Aquí defines cuántos personajes de cada tipo puede crear cada usuario por gene
       "default": {"estudiantes": 2, "trabajadores": 1, "profesores": 1}
   }
   ```
+### 🪪 Imágenes de los Carnés de Identidad
+
+El bot incluye imágenes de carnés de identidad **prediseñadas para el servidor Isefora Academia Arcana**. Para adaptarlas a tu servidor necesitas reemplazarlas:
+
+> ⚠️ **Importante:** Los archivos de imagen deben mantener **exactamente los mismos nombres** que los originales para que el bot los encuentre correctamente.
+
+1. Ve a la carpeta donde están guardadas las imágenes de los carnés (dentro del proyecto)
+2. Diseña tus propias versiones para tu servidor siguiendo la misma plantilla / disposición de los carnés de ejemplo.
+3. Guárdalas con los **mismos nombres de archivo** que las originales (respetando mayúsculas, minúsculas y extensión)
+4. Reemplaza los archivos originales con los tuyos
+
+Si subes una imagen con un nombre distinto o en una carpeta diferente, el bot no podrá encontrarla y los carnés no se generarán correctamente.
 
 ---
 
