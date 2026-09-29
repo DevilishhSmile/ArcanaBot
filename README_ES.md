@@ -420,14 +420,20 @@ Aquí defines cuántos personajes de cada tipo puede crear cada usuario por gene
 
 El bot incluye imágenes de carnés de identidad **prediseñadas para el servidor Isefora Academia Arcana**. Para adaptarlas a tu servidor necesitas reemplazarlas:
 
-> ⚠️ **Importante:** Los archivos de imagen deben mantener **exactamente los mismos nombres** que los originales para que el bot los encuentre correctamente.
+> ⚠️ **Importante:** Los archivos de imagen deben mantener **exactamente los mismos nombres** que los originales y estar en la **raíz del proyecto** (la carpeta principal, junto a `bot.py`) para que el bot los encuentre correctamente.
+
+| Archivo | Para quién | Dimensiones |
+|---|---|---|
+| `IDEstudiante.png` | Estudiantes | 600 × 400 px |
+| `IDWorker.png` | Profesores y Trabajadores | 400 × 600 px |
 
 1. Ve a la carpeta donde están guardadas las imágenes de los carnés (dentro del proyecto)
 2. Diseña tus propias versiones para tu servidor siguiendo la misma plantilla / disposición de los carnés de ejemplo.
-3. Guárdalas con los **mismos nombres de archivo** que las originales (respetando mayúsculas, minúsculas y extensión)
-4. Reemplaza los archivos originales con los tuyos
+3. Guárdalas con los **mismos nombres de archivo** (`IDEstudiante.png` y `IDWorker.png`) que las originales (respetando mayúsculas, minúsculas y extensión)
+4. Cópialas a la carpeta raíz del proyecto, reemplazando los archivos originales
 
 Si subes una imagen con un nombre distinto o en una carpeta diferente, el bot no podrá encontrarla y los carnés no se generarán correctamente.
+> 💡 **Consejo:** Deja espacio en blanco en las zonas donde el bot escribe el texto (nombre, casa, generación, código) y donde pega la foto del personaje. Si no tienes claro dónde van esas zonas, usa primero las plantillas originales como referencia visual.
 
 ---
 
