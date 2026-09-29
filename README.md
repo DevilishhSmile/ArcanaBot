@@ -416,6 +416,25 @@ This defines how many characters of each type each user can create per generatio
       "default": {"estudiantes": 2, "trabajadores": 1, "profesores": 1}
   }
   ```
+### 🪪 Identity Card Images
+
+The bot includes identity card images **pre-designed for the Isefora Academia Arcana server**. To adapt them to your server you need to replace them with your own designs:
+
+> ⚠️ **Important:** Image files must keep **exactly the same names** as the originals and be placed in the **project root** (the main folder, next to `bot.py`) so the bot can find them correctly.
+
+| File | For | Dimensions |
+|---|---|---|
+| `IDEstudiante.png` | Students | 600 × 400 px |
+| `IDWorker.png` | Teachers & Staff | 400 × 600 px |
+
+1. Go to the folder where the card images are stored (inside the project)
+2. Design your own versions for your server following the same template / disposition of the card imagaes.
+3. Save them with the **exact same file names** (`IDEstudiante.png` and `IDWorker.png`) as the originals (matching uppercase, lowercase, and extension)
+4. Copy them to the project root folder, replacing the original files
+
+If you upload an image with a different name or place it in a different folder, the bot won't be able to find it and the cards won't generate correctly.
+
+> 💡 **Tip:** Leave blank space in the areas where the bot writes text (name, house, generation, code) and where it places the character photo. If you're unsure where those areas are, use the original templates as a visual reference first.
 
 ---
 
